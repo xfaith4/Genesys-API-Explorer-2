@@ -1,0 +1,550 @@
+name: Test PowerShell Script
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Validate PowerShell syntax
+      shell: pwsh
+      run: |
+        $scriptPath = ".\GenesysCloudAPIExplorer.ps1"
+        Write-Host "Validating PowerShell syntax for: $scriptPath"
+        
+        $tokens = $null
+        $errors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+            $scriptPath,
+            [ref]$tokens,
+            [ref]$errors
+        )
+        
+        if ($errors.Count -gt 0) {
+            Write-Host "::error::PowerShell syntax errors found:"
+            foreach ($error in $errors) {
+                Write-Host "::error::$($error.Message) at line $($error.Extent.StartLineNumber)"
+            }
+            exit 1
+        }
+        
+        Write-Host "PowerShell syntax validation passed!"
+        
+    - name: Validate JSON endpoint catalog
+      shell: pwsh
+      run: |
+        $jsonPath = ".\GenesysCloudAPIEndpoints.json"
+        Write-Host "Validating JSON syntax for: $jsonPath"
+        
+        try {
+            $content = Get-Content -Path $jsonPath -Raw
+            $json = $content | ConvertFrom-Json -ErrorAction Stop
+            Write-Host "JSON validation passed!"
+            
+            # Check for expected structure
+            $hasOpenApiCache = $false
+            foreach ($prop in $json.PSObject.Properties) {
+                if ($prop.Value -and $prop.Value.paths) {
+                    $hasOpenApiCache = $true
+                    $pathCount = ($prop.Value.paths.PSObject.Properties | Measure-Object).Count
+                    Write-Host "Found API catalog with $pathCount endpoint paths"
+                    break
+                }
+            }
+            
+            if (-not $hasOpenApiCache) {
+                Write-Host "::warning::Could not find 'paths' section in API catalog"
+            }
+        }
+        catch {
+            Write-Host "::error::JSON parsing failed: $($_.Exception.Message)"
+            exit 1
+        }
+        
+    - name: Test helper functions
+      shell: pwsh
+      run: |
+        Write-Host "Testing helper functions from the script..."
+        
+        # Load only the function definitions (without running the GUI)
+        $scriptContent = Get-Content -Path ".\GenesysCloudAPIExplorer.ps1" -Raw
+        
+        # Extract and test specific functions
+        # Test Build-GroupMap function logic
+        $testPaths = @{
+            "/api/v2/users" = @{}
+            "/api/v2/users/{userId}" = @{}
+            "/api/v2/conversations" = @{}
+            "/api/v2/routing/queues" = @{}
+        }
+        
+        # Simulate Build-GroupMap logic
+        $map = @{}
+        foreach ($path in $testPaths.Keys) {
+            if ($path -match "^/api/v2/([^/]+)") {
+                $group = $Matches[1]
+            }
+            else {
+                $group = "Other"
+            }
+            
+            if (-not $map.ContainsKey($group)) {
+                $map[$group] = @()
+            }
+            $map[$group] += $path
+        }
+        
+        # Validate results
+        if ($map.Keys.Count -ne 3) {
+            Write-Host "::error::Expected 3 groups, got $($map.Keys.Count)"
+            exit 1
+        }
+        
+        if ($map["users"].Count -ne 2) {
+            Write-Host "::error::Expected 2 paths in 'users' group"
+            exit 1
+        }
+        
+        Write-Host "Group mapping logic test passed!"
+        
+        # Test Get-GroupForPath logic
+        function Test-GetGroupForPath {
+            param ([string]$Path)
+            if ($Path -match "^/api/v2/([^/]+)") {
+                return $Matches[1]
+            }
+            return "Other"
+        }
+        
+        $testCases = @(
+            @{ Path = "/api/v2/users"; Expected = "users" },
+            @{ Path = "/api/v2/conversations/{conversationId}"; Expected = "conversations" },
+            @{ Path = "/other/path"; Expected = "Other" }
+        )
+        
+        foreach ($case in $testCases) {
+            $result = Test-GetGroupForPath -Path $case.Path
+            if ($result -ne $case.Expected) {
+                Write-Host "::error::GetGroupForPath test failed for '$($case.Path)': expected '$($case.Expected)', got '$result'"
+                exit 1
+            }
+        }
+        
+        Write-Host "GetGroupForPath logic test passed!"
+        
+        # Test Job-StatusIsPending logic
+        function Test-JobStatusIsPending {
+            param ([string]$Status)
+            if (-not $Status) { return $false }
+            return $Status -match '^(pending|running|in[-]?progress|processing|created)$'
+        }
+        
+        $pendingStatuses = @("pending", "running", "in-progress", "inprogress", "processing", "created")
+        $completedStatuses = @("completed", "failed", "success", "done", "")
+        
+        foreach ($status in $pendingStatuses) {
+            if (-not (Test-JobStatusIsPending -Status $status)) {
+                Write-Host "::error::JobStatusIsPending should return true for '$status'"
+                exit 1
+            }
+        }
+        
+        foreach ($status in $completedStatuses) {
+            if (Test-JobStatusIsPending -Status $status) {
+                Write-Host "::error::JobStatusIsPending should return false for '$status'"
+                exit 1
+            }
+        }
+        
+        Write-Host "JobStatusIsPending logic test passed!"
+        
+        # Extract all timeline-related functions from the main script
+        # We need Get-GCConversationDetailsTimeline, Merge-GCConversationEvents, 
+        # Format-GCConversationTimelineText, Get-GCConversationSummary, 
+        # Format-GCConversationSummaryText, and Format-ConversationReportText
+        
+        # For efficiency, extract functions by finding their positions in the script
+        # and using substring to avoid regex performance issues
+        Write-Host "Extracting functions from script..."
+        
+        # Find function boundaries using simpler patterns
+        $funcNames = @(
+            "Get-GCConversationDetailsTimeline",
+            "Merge-GCConversationEvents",
+            "Format-GCConversationTimelineText",
+            "Get-GCConversationSummary",
+            "Format-GCConversationSummaryText",
+            "Format-ConversationReportText",
+            "Get-GCConversationDurationAnalysis",
+            "Get-GCParticipantStatistics",
+            "Get-GCConversationFlowPath",
+            "Get-GCConversationKeyInsights",
+            "Get-GCErrorExplanation",
+            "Format-GCKeyInsightsText",
+            "Format-GCDurationAnalysisText",
+            "Format-GCParticipantStatisticsText",
+            "Format-GCConversationFlowText"
+        )
+        
+        # Extract each function by finding its start position and then the next function or end
+        $lines = $scriptContent -split "`n"
+        $functionsCode = ""
+        $inFunction = $false
+        $braceCount = 0
+        $currentFunction = ""
+        
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            $line = $lines[$i]
+            
+            # Check if we're starting a function we care about
+            foreach ($fname in $funcNames) {
+                if ($line -match "^function $fname ") {
+                    $inFunction = $true
+                    $currentFunction = $fname
+                    $braceCount = 0
+                    break
+                }
+            }
+            
+            if ($inFunction) {
+                $functionsCode += $line + "`n"
+                
+                # Count braces
+                $braceCount += ($line.ToCharArray() | Where-Object { $_ -eq '{' }).Count
+                $braceCount -= ($line.ToCharArray() | Where-Object { $_ -eq '}' }).Count
+                
+                # If braces are balanced and we've seen at least one opening brace
+                if ($braceCount -eq 0 -and $line.Contains('}')) {
+                    $inFunction = $false
+                    Write-Host "Extracted $currentFunction"
+                }
+            }
+        }
+        
+        if (-not $functionsCode) {
+            Write-Host "::error::Could not extract any functions from script"
+            exit 1
+        }
+        
+        # Execute the extracted functions
+        Invoke-Expression $functionsCode
+        Write-Host "All required functions loaded"
+        
+        # Test with empty report
+        $testReport = [PSCustomObject]@{
+            ConversationId      = "test-conv-123"
+            ConversationDetails = $null
+            AnalyticsDetails    = $null
+            RetrievedAt         = "2025-01-01T00:00:00Z"
+            Errors              = @()
+        }
+        
+        $reportText = Format-ConversationReportText -Report $testReport
+        
+        if (-not $reportText.Contains("CONVERSATION REPORT")) {
+            Write-Host "::error::Format-ConversationReportText should include CONVERSATION REPORT header"
+            exit 1
+        }
+        
+        if (-not $reportText.Contains("test-conv-123")) {
+            Write-Host "::error::Format-ConversationReportText should include conversation ID"
+            exit 1
+        }
+        
+        if (-not $reportText.Contains("CONVERSATION DETAILS: Not available")) {
+            Write-Host "::error::Format-ConversationReportText should show 'Not available' when ConversationDetails is null"
+            exit 1
+        }
+        
+        if (-not $reportText.Contains("END OF REPORT")) {
+            Write-Host "::error::Format-ConversationReportText should include END OF REPORT footer"
+            exit 1
+        }
+        
+        if (-not $reportText.Contains("CHRONOLOGICAL TIMELINE")) {
+            Write-Host "::error::Format-ConversationReportText should include CHRONOLOGICAL TIMELINE section"
+            exit 1
+        }
+        
+        Write-Host "Format-ConversationReportText logic test passed!"
+        
+        # Test with errors
+        $testReportWithErrors = [PSCustomObject]@{
+            ConversationId      = "test-conv-456"
+            ConversationDetails = $null
+            AnalyticsDetails    = $null
+            RetrievedAt         = "2025-01-01T00:00:00Z"
+            Errors              = @("Test error 1", "Test error 2")
+        }
+        
+        $reportTextWithErrors = Format-ConversationReportText -Report $testReportWithErrors
+        
+        if (-not $reportTextWithErrors.Contains("ERRORS")) {
+            Write-Host "::error::Format-ConversationReportText should include ERRORS section when errors exist"
+            exit 1
+        }
+        
+        if (-not $reportTextWithErrors.Contains("Test error 1")) {
+            Write-Host "::error::Format-ConversationReportText should include error messages"
+            exit 1
+        }
+        
+        Write-Host "Format-ConversationReportText error handling test passed!"
+        
+        # Test timeline functions with mock data
+        Write-Host ""
+        Write-Host "Testing timeline extraction and merging functions..."
+        
+        # Create mock report with analytics data containing segments
+        $mockAnalyticsDetails = [PSCustomObject]@{
+            participants = @(
+                [PSCustomObject]@{
+                    participantId = "p1"
+                    participantName = "Agent Smith"
+                    purpose = "agent"
+                    sessions = @(
+                        [PSCustomObject]@{
+                            sessionId = "s1"
+                            mediaType = "voice"
+                            direction = "inbound"
+                            ani = "+15551234567"
+                            dnis = "+15559876543"
+                            segments = @(
+                                [PSCustomObject]@{
+                                    segmentType = "interact"
+                                    segmentStart = "2025-01-15T14:32:05Z"
+                                    segmentEnd = "2025-01-15T14:34:10Z"
+                                    metrics = @(
+                                        [PSCustomObject]@{
+                                            name = "nMos"
+                                            value = 3.2
+                                        }
+                                    )
+                                    errorCode = "network.packetloss"
+                                    disconnectType = "agent"
+                                }
+                            )
+                        }
+                    )
+                }
+            )
+        }
+        
+        $mockConversationDetails = [PSCustomObject]@{
+            participants = @(
+                [PSCustomObject]@{
+                    id = "p1"
+                    name = "Agent Smith"
+                    purpose = "agent"
+                    startTime = "2025-01-15T14:32:00Z"
+                    endTime = "2025-01-15T14:34:15Z"
+                    disconnectType = "agent"
+                }
+            )
+        }
+        
+        $mockReport = [PSCustomObject]@{
+            ConversationId = "test-timeline-123"
+            ConversationDetails = $mockConversationDetails
+            AnalyticsDetails = $mockAnalyticsDetails
+            RetrievedAt = "2025-01-15T15:00:00Z"
+            Errors = @()
+        }
+        
+        # Test Get-GCConversationDetailsTimeline
+        $events = Get-GCConversationDetailsTimeline -Report $mockReport
+        
+        if (-not $events -or $events.Count -eq 0) {
+            Write-Host "::error::Get-GCConversationDetailsTimeline should return events from mock data"
+            exit 1
+        }
+        
+        Write-Host "Get-GCConversationDetailsTimeline returned $($events.Count) events"
+        
+        # Test Merge-GCConversationEvents
+        $sortedEvents = Merge-GCConversationEvents -Events $events
+        
+        if (-not $sortedEvents -or $sortedEvents.Count -eq 0) {
+            Write-Host "::error::Merge-GCConversationEvents should return sorted events"
+            exit 1
+        }
+        
+        # Verify events are sorted by timestamp
+        $lastTimestamp = $null
+        foreach ($evt in $sortedEvents) {
+            if ($lastTimestamp -and $evt.Timestamp -lt $lastTimestamp) {
+                Write-Host "::error::Events are not sorted chronologically"
+                exit 1
+            }
+            $lastTimestamp = $evt.Timestamp
+        }
+        
+        Write-Host "Merge-GCConversationEvents sorting test passed!"
+        
+        # Test Format-GCConversationTimelineText
+        $timelineText = Format-GCConversationTimelineText -Events $sortedEvents
+        
+        if (-not $timelineText) {
+            Write-Host "::error::Format-GCConversationTimelineText should return text output"
+            exit 1
+        }
+        
+        # Check for MOS degraded marker
+        if ($timelineText.Contains("MOS=3.20") -and -not $timelineText.Contains("DEGRADED")) {
+            Write-Host "::error::Timeline should mark MOS < 3.5 as DEGRADED"
+            exit 1
+        }
+        
+        Write-Host "Format-GCConversationTimelineText test passed!"
+        
+        # Test Get-GCConversationSummary
+        $summary = Get-GCConversationSummary -ConversationId "test-timeline-123" -Events $sortedEvents
+        
+        if (-not $summary) {
+            Write-Host "::error::Get-GCConversationSummary should return summary object"
+            exit 1
+        }
+        
+        if ($summary.ConversationId -ne "test-timeline-123") {
+            Write-Host "::error::Summary should include conversation ID"
+            exit 1
+        }
+        
+        Write-Host "Get-GCConversationSummary test passed!"
+        
+        # Test Format-GCConversationSummaryText
+        $summaryText = Format-GCConversationSummaryText -Summary $summary
+        
+        if (-not $summaryText.Contains("Summary")) {
+            Write-Host "::error::Summary text should include 'Summary' header"
+            exit 1
+        }
+        
+        if (-not $summaryText.Contains("Segments:")) {
+            Write-Host "::error::Summary text should include segment count"
+            exit 1
+        }
+        
+        Write-Host "Format-GCConversationSummaryText test passed!"
+        
+        # Test full report with timeline data
+        $fullReport = Format-ConversationReportText -Report $mockReport
+        
+        if (-not $fullReport.Contains("CHRONOLOGICAL TIMELINE")) {
+            Write-Host "::error::Full report should include CHRONOLOGICAL TIMELINE section"
+            exit 1
+        }
+        
+        if (-not $fullReport.Contains("Summary")) {
+            Write-Host "::error::Full report should include Summary section"
+            exit 1
+        }
+        
+        Write-Host "Full report with timeline test passed!"
+        
+        # Test new insight functions
+        Write-Host ""
+        Write-Host "Testing new insight functions..."
+        
+        # Test Get-GCConversationDurationAnalysis
+        $durationAnalysis = Get-GCConversationDurationAnalysis -Report $mockReport -Events $sortedEvents
+        if (-not $durationAnalysis) {
+            Write-Host "::error::Get-GCConversationDurationAnalysis should return analysis"
+            exit 1
+        }
+        Write-Host "Get-GCConversationDurationAnalysis test passed!"
+        
+        # Test Get-GCParticipantStatistics
+        $participantStats = Get-GCParticipantStatistics -Report $mockReport
+        if (-not $participantStats) {
+            Write-Host "::error::Get-GCParticipantStatistics should return participant stats"
+            exit 1
+        }
+        Write-Host "Get-GCParticipantStatistics test passed!"
+        
+        # Test Get-GCConversationFlowPath
+        $flowPath = Get-GCConversationFlowPath -Report $mockReport
+        if (-not $flowPath) {
+            Write-Host "::error::Get-GCConversationFlowPath should return flow path"
+            exit 1
+        }
+        Write-Host "Get-GCConversationFlowPath test passed!"
+        
+        # Test Get-GCConversationKeyInsights
+        $keyInsights = Get-GCConversationKeyInsights -Report $mockReport -DurationAnalysis $durationAnalysis -ParticipantStats $participantStats -Summary $summary
+        if (-not $keyInsights) {
+            Write-Host "::error::Get-GCConversationKeyInsights should return insights"
+            exit 1
+        }
+        Write-Host "Get-GCConversationKeyInsights test passed!"
+        
+        # Test Get-GCErrorExplanation
+        $explanation = Get-GCErrorExplanation -ErrorCode "sip:503"
+        if (-not $explanation) {
+            Write-Host "::error::Get-GCErrorExplanation should return explanation"
+            exit 1
+        }
+        Write-Host "Get-GCErrorExplanation test passed!"
+        
+        # Test Format-GCKeyInsightsText
+        $insightsText = Format-GCKeyInsightsText -Insights $keyInsights
+        if (-not $insightsText.Contains("KEY INSIGHTS")) {
+            Write-Host "::error::Format-GCKeyInsightsText should include KEY INSIGHTS header"
+            exit 1
+        }
+        Write-Host "Format-GCKeyInsightsText test passed!"
+        
+        # Test Format-GCDurationAnalysisText
+        $durationText = Format-GCDurationAnalysisText -Analysis $durationAnalysis
+        if (-not $durationText.Contains("DURATION ANALYSIS")) {
+            Write-Host "::error::Format-GCDurationAnalysisText should include DURATION ANALYSIS header"
+            exit 1
+        }
+        Write-Host "Format-GCDurationAnalysisText test passed!"
+        
+        # Test Format-GCParticipantStatisticsText
+        $participantText = Format-GCParticipantStatisticsText -Stats $participantStats
+        if (-not $participantText.Contains("PARTICIPANT STATISTICS")) {
+            Write-Host "::error::Format-GCParticipantStatisticsText should include header"
+            exit 1
+        }
+        Write-Host "Format-GCParticipantStatisticsText test passed!"
+        
+        # Test Format-GCConversationFlowText
+        $flowText = Format-GCConversationFlowText -FlowPath $flowPath
+        if (-not $flowText.Contains("CONVERSATION FLOW PATH")) {
+            Write-Host "::error::Format-GCConversationFlowText should include header"
+            exit 1
+        }
+        Write-Host "Format-GCConversationFlowText test passed!"
+        
+        # Test that full report includes new sections when data is available
+        if (-not $fullReport.Contains("KEY INSIGHTS")) {
+            Write-Host "::error::Full report should include KEY INSIGHTS section"
+            exit 1
+        }
+        
+        if (-not $fullReport.Contains("DURATION ANALYSIS")) {
+            Write-Host "::error::Full report should include DURATION ANALYSIS section"
+            exit 1
+        }
+        
+        if (-not $fullReport.Contains("PARTICIPANT STATISTICS")) {
+            Write-Host "::error::Full report should include PARTICIPANT STATISTICS section"
+            exit 1
+        }
+        
+        Write-Host "All new insight function tests passed!"
+        
+        Write-Host ""
+        Write-Host "All helper function tests passed!"

@@ -1,0 +1,29 @@
+{
+  "id": "gc.queues.smoke.v1",
+  "name": "Queue Smoke Detector",
+  "version": "1.0.1",
+  "description": "Ranks queues and agents by failure indicators for a time window using the existing smoke report function.",
+  "tags": ["queues", "operations", "triage"],
+  "parameters": {
+    "startDate": "2025-12-01T00:00:00Z",
+    "endDate": "2025-12-08T00:00:00Z",
+    "topN": 10
+  },
+  "pipeline": [
+    {
+      "id": "smoke",
+      "type": "compute",
+      "script": "param($ctx)\n# Build Genesys 'interval' range\n$interval = \"$($ctx.Parameters.startDate)/$($ctx.Parameters.endDate)\"\nGet-GCQueueSmokeReport -Interval $interval -TopN ([int]$ctx.Parameters.topN)\n"
+    },
+    {
+      "id": "metricQueues",
+      "type": "metric",
+      "script": "param($ctx)\n$top = @($ctx.Data.smoke.QueueTop)\n[pscustomobject]@{ title='Top Queues (Abandon/Error)'; value=$top.Count; items=$top }\n"
+    },
+    {
+      "id": "metricAgents",
+      "type": "metric",
+      "script": "param($ctx)\n$top = @($ctx.Data.smoke.AgentTop)\n[pscustomobject]@{ title='Top Agents (Abandon/Error)'; value=$top.Count; items=$top }\n"
+    }
+  ]
+}
