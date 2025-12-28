@@ -25,26 +25,24 @@ if (-not $script:GCContext) {
     }
 }
 
-function Import-ScriptFolder {
+function Get-ScriptFiles {
     param(
         [Parameter(Mandatory)]
         [string]$Directory
     )
 
     if (-not (Test-Path -LiteralPath $Directory)) {
-        return
+        return @()
     }
 
-    Get-ChildItem -Path $Directory -Filter '*.ps1' -File | Sort-Object Name | ForEach-Object {
-        . $_.FullName
-    }
+    return @(Get-ChildItem -Path $Directory -Filter '*.ps1' -File | Sort-Object Name)
 }
 
 $privateDir = Join-Path $moduleRoot 'Private'
 $publicDir  = Join-Path $moduleRoot 'Public'
 
-Import-ScriptFolder -Directory $privateDir
-Import-ScriptFolder -Directory $publicDir
+foreach ($file in (Get-ScriptFiles -Directory $privateDir)) { . $file.FullName }
+foreach ($file in (Get-ScriptFiles -Directory $publicDir)) { . $file.FullName }
 
 $publicFunctions = @(
     'Connect-GCCloud',
@@ -58,6 +56,7 @@ $publicFunctions = @(
     'Import-GCSnapshot',
     'Invoke-GCInsightPack',
     'Invoke-GCInsightPackCompare',
+    'Invoke-GCInsightPackTest',
     'Invoke-GCInsightsPack',
     'Export-GCInsightPackSnapshot',
     'Export-GCInsightPackExcel',

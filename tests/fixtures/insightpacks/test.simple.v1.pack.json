@@ -1,0 +1,25 @@
+{
+  "id": "test.simple.v1",
+  "name": "Test Pack (Simple)",
+  "version": "1.0.0",
+  "description": "Offline test pack for fixture-backed requests.",
+  "maturity": "alpha",
+  "owner": "tests",
+  "expectedRuntimeSec": 1,
+  "scopes": ["users:read"],
+  "parameters": {},
+  "pipeline": [
+    {
+      "id": "me",
+      "type": "gcRequest",
+      "method": "GET",
+      "uri": "/api/v2/users/me"
+    },
+    {
+      "id": "metricMe",
+      "type": "metric",
+      "script": "param($ctx)\n[pscustomobject]@{ title='Me'; value=$ctx.Data.me.name; items=@() }\n"
+    }
+  ]
+}
+

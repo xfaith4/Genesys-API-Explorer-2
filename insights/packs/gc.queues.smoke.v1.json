@@ -2,7 +2,11 @@
   "id": "gc.queues.smoke.v1",
   "name": "Queue Smoke Detector",
   "version": "1.0.1",
+  "maturity": "alpha",
+  "owner": "Ops Insights",
+  "expectedRuntimeSec": 60,
   "description": "Ranks queues and agents by failure indicators for a time window using the existing smoke report function.",
+  "scopes": ["analytics:read"],
   "tags": ["queues", "operations", "triage"],
   "parameters": {
     "startDate": "2025-12-01T00:00:00Z",

@@ -6,10 +6,13 @@ This is a working checklist for making Insight Packs more powerful and the resul
 
 - [ ] Add typed parameter definitions (`type`, `required`, `default`, `description`) across existing packs and UI parameter capture.
 - [ ] Validate packs against `insights/schema/insightpack.schema.json` (optional strict mode).
-- [ ] Add a `dryRun` mode: resolve templates + show planned requests without calling APIs.
 - [x] Add a `dryRun` mode: resolve templates + show planned requests without calling APIs.
 - [x] Add baseline comparison runner (previous window) for packs that accept `startDate`/`endDate`.
 - [x] Add a pack catalog UI + dynamic parameter rendering in Ops Console.
+- [x] Ensure Ops Insights runs use the UI OAuth token (no hidden global state).
+- [x] Display pack metadata (tags/scopes/endpoints) in the Ops Console.
+- [x] Add file+TTL caching for `gcRequest` steps (opt-in) to speed up weekly/monthly packs.
+- [ ] Standardize pack metadata: `owner`, `maturity`, `expectedRuntimeSec`, `scopes` (add across all packs).
 
 ## Pipeline engine features
 
@@ -28,9 +31,16 @@ This is a working checklist for making Insight Packs more powerful and the resul
 ## Discoverability & governance
 
 - [ ] Pack catalog/index (tags, owner, scopes/permissions, expected runtime, maturity, examples).
-- [ ] Pack testing harness (`Invoke-GCInsightPackTest`) with fixtures + snapshot assertions for computed metrics.
+- [x] Pack testing harness (`Invoke-GCInsightPackTest`) with fixtures + snapshot assertions for computed metrics.
 - [x] Append export entries to a briefings `index.json` for lightweight run history.
 - [x] Load and browse briefing history from `index.json` in the Ops Console.
+
+## Next steps (Phase 1)
+
+- [ ] Add a “time window” picker (WoW/MoM presets) that feeds `startDate`/`endDate` for packs.
+- [ ] Improve briefing HTML for compare runs (deltas, highlights, and “what changed” narrative).
+- [ ] Add a basic pack “Examples” area (recommended params + expected runtime) shown in the catalog.
+- [ ] Finish migrating packs to typed parameters (including validation + friendly errors).
 
 ## Packs added (initial set)
 

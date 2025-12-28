@@ -2,7 +2,11 @@
   "id": "gc.calls.peakConcurrency.monthly.v1",
   "name": "Peak Concurrent Voice Calls (Monthly)",
   "version": "1.0.0",
+  "maturity": "alpha",
+  "owner": "Ops Insights",
+  "expectedRuntimeSec": 240,
   "description": "Computes peak concurrent voice sessions over a time window using Analytics Conversation Detail Jobs (1-minute buckets).",
+  "scopes": ["analytics:read"],
   "tags": ["calls", "voice", "capacity", "analytics"],
   "parameters": {
     "startDate": {

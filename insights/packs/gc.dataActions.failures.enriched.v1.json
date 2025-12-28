@@ -2,7 +2,11 @@
   "id": "gc.dataActions.failures.enriched.v1",
   "name": "Data Action Failures (Enriched)",
   "version": "1.0.0",
+  "maturity": "alpha",
+  "owner": "Ops Insights",
+  "expectedRuntimeSec": 90,
   "description": "Ranks Data Actions by failures for a time window and enriches results with action + integration metadata and response-code breakdowns.",
+  "scopes": ["analytics:read", "integrations:read"],
   "tags": ["data-actions", "integrations", "reliability", "triage"],
   "parameters": {
     "startDate": {

@@ -68,7 +68,12 @@ function Get-InsightPackCatalog {
                     Name        = [string]($pack.name ?? $pack.id)
                     Version     = [string]($pack.version ?? '')
                     Description = [string]($pack.description ?? '')
+                    Scopes      = @($pack.scopes ?? $pack.requiredScopes)
+                    Owner       = [string]($pack.owner ?? '')
+                    Maturity    = [string]($pack.maturity ?? '')
+                    ExpectedRuntimeSec = if ($pack.PSObject.Properties.Name -contains 'expectedRuntimeSec') { $pack.expectedRuntimeSec } else { $null }
                     Tags        = @($pack.tags)
+                    Endpoints   = @(@($pack.pipeline) | Where-Object { $_ -and $_.type -and ($_.type.ToString().ToLowerInvariant() -eq 'gcrequest') } | ForEach-Object { $_.uri ?? $_.path } | Where-Object { $_ })
                     FileName    = $_.Name
                     FullPath    = $_.FullName
                     Pack        = $pack
@@ -4613,6 +4618,25 @@ function Ensure-OpsInsightsModuleLoaded {
     }
 }
 
+function Ensure-OpsInsightsContext {
+    if (-not $tokenBox) {
+        throw "OAuth token input control is not available."
+    }
+
+    $token = $tokenBox.Text
+    if ([string]::IsNullOrWhiteSpace($token)) {
+        throw "Please provide an OAuth token before running Insight Packs."
+    }
+
+    try {
+        Set-GCContext -ApiBaseUri $ApiBaseUrl -AccessToken ($token.Trim()) | Out-Null
+    }
+    catch {
+        # Fallback to global token for older module behaviors
+        $global:AccessToken = $token.Trim()
+    }
+}
+
 $UserProfileBase = if ($env:USERPROFILE) { $env:USERPROFILE } else { $ScriptRoot }
 $FavoritesFile = Join-Path -Path $UserProfileBase -ChildPath "GenesysApiExplorerFavorites.json"
 
@@ -4988,6 +5012,11 @@ $Xaml = @"
                   <Button Name="RunSelectedInsightPackButton" Width="120" Height="30" Content="Run"/>
                   <Button Name="CompareSelectedInsightPackButton" Width="140" Height="30" Content="Compare (Prev)" Margin="10 0 0 0"/>
                   <Button Name="DryRunSelectedInsightPackButton" Width="110" Height="30" Content="Dry Run" Margin="10 0 0 0"/>
+                  <CheckBox Name="UseInsightCacheCheckbox" Content="Cache" VerticalAlignment="Center" Margin="14 0 0 0" IsChecked="True"
+                            ToolTip="Cache gcRequest steps to disk (file+TTL)"/>
+                  <TextBlock Text="TTL (min)" VerticalAlignment="Center" Margin="10 0 6 0" Foreground="SlateGray"/>
+                  <TextBox Name="InsightCacheTtlInput" Width="60" Height="26" VerticalContentAlignment="Center" Text="60"
+                           ToolTip="Cache time-to-live in minutes"/>
                   <Button Name="ExportInsightBriefingButton" Width="130" Height="30" Content="Export Briefing" Margin="10 0 0 0" IsEnabled="False"/>
                 </StackPanel>
 
@@ -5008,8 +5037,18 @@ $Xaml = @"
                   <TextBox Grid.Column="4" Name="InsightGlobalEndInput" Width="220" Height="26" VerticalContentAlignment="Center"
                            ToolTip="Default endDate for packs that define endDate (ISO-8601 UTC)"/>
                 </Grid>
+                <Expander Grid.Row="2" Grid.ColumnSpan="2" Header="Pack Metadata" IsExpanded="False" Margin="0 0 0 8">
+                  <Border BorderBrush="#D0D7E2" BorderThickness="1" CornerRadius="6" Padding="10" Background="White">
+                    <TextBox Name="InsightPackMetaText" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             FontFamily="Consolas" FontSize="10" Background="#F5F5F5" MinHeight="90"/>
+                  </Border>
+                </Expander>
+                <Border Grid.Row="3" Grid.ColumnSpan="2" Background="#FFF8E1" BorderBrush="#F3D17A" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0 0 0 8">
+                  <TextBlock Name="InsightPackWarningsText" Text=" " TextWrapping="Wrap" Foreground="#6B4E00"/>
+                </Border>
 
-                <ScrollViewer Grid.Row="2" Grid.ColumnSpan="2" VerticalScrollBarVisibility="Auto" MaxHeight="240">
+                <ScrollViewer Grid.Row="4" Grid.ColumnSpan="2" VerticalScrollBarVisibility="Auto" MaxHeight="240">
                   <StackPanel Name="InsightPackParametersPanel"/>
                 </ScrollViewer>
               </Grid>
@@ -5222,8 +5261,12 @@ $clearHistoryButton = $Window.FindName("ClearHistoryButton")
  $runSelectedInsightPackButton = $Window.FindName("RunSelectedInsightPackButton")
  $compareSelectedInsightPackButton = $Window.FindName("CompareSelectedInsightPackButton")
  $dryRunSelectedInsightPackButton = $Window.FindName("DryRunSelectedInsightPackButton")
+ $useInsightCacheCheckbox = $Window.FindName("UseInsightCacheCheckbox")
+ $insightCacheTtlInput = $Window.FindName("InsightCacheTtlInput")
  $insightPackCombo = $Window.FindName("InsightPackCombo")
  $insightPackDescriptionText = $Window.FindName("InsightPackDescriptionText")
+ $insightPackMetaText = $Window.FindName("InsightPackMetaText")
+ $insightPackWarningsText = $Window.FindName("InsightPackWarningsText")
  $insightPackParametersPanel = $Window.FindName("InsightPackParametersPanel")
  $insightGlobalStartInput = $Window.FindName("InsightGlobalStartInput")
  $insightGlobalEndInput = $Window.FindName("InsightGlobalEndInput")
@@ -5547,6 +5590,7 @@ function Run-InsightPackWorkflow {
 
     try {
         Ensure-OpsInsightsModuleLoaded
+        Ensure-OpsInsightsContext
         $result = Invoke-GCInsightPack -PackPath $packPath
         $script:LastInsightResult = $result
         Update-InsightPackUi -Result $result
@@ -6743,8 +6787,38 @@ if ($insightPackCombo) {
             if ($insightPackDescriptionText) {
                 $insightPackDescriptionText.Text = if ($selected.Description) { $selected.Description } else { $selected.Id }
             }
+            if ($insightPackMetaText) {
+                $tags = if ($selected.Tags -and $selected.Tags.Count -gt 0) { ($selected.Tags -join ', ') } else { '' }
+                $scopes = if ($selected.Scopes -and $selected.Scopes.Count -gt 0) { ($selected.Scopes -join ', ') } else { '' }
+                $endpoints = if ($selected.Endpoints -and $selected.Endpoints.Count -gt 0) { ($selected.Endpoints -join "`n") } else { '' }
+
+                $lines = New-Object System.Collections.Generic.List[string]
+                if ($selected.Version) { $lines.Add("Version: $($selected.Version)") | Out-Null }
+                if ($selected.Maturity) { $lines.Add("Maturity: $($selected.Maturity)") | Out-Null }
+                if ($selected.Owner) { $lines.Add("Owner: $($selected.Owner)") | Out-Null }
+                if ($null -ne $selected.ExpectedRuntimeSec) { $lines.Add("Expected runtime: $($selected.ExpectedRuntimeSec)s") | Out-Null }
+                if ($tags) { $lines.Add("Tags: $tags") | Out-Null }
+                if ($scopes) { $lines.Add("Scopes: $scopes") | Out-Null }
+                if ($selected.FullPath) { $lines.Add("Path: $($selected.FullPath)") | Out-Null }
+                if ($endpoints) {
+                    $lines.Add("Endpoints:") | Out-Null
+                    $lines.Add($endpoints) | Out-Null
+                }
+                $insightPackMetaText.Text = ($lines -join "`n")
+            }
             if ($insightPackParametersPanel) {
                 Render-InsightPackParameters -Pack $selected.Pack -Panel $insightPackParametersPanel
+            }
+
+            if ($insightPackWarningsText) {
+                $warnings = New-Object System.Collections.Generic.List[string]
+                if ($selected.Scopes -and $selected.Scopes.Count -gt 0) {
+                    $warnings.Add("Requires OAuth scopes: $($selected.Scopes -join ', ')") | Out-Null
+                }
+                if ($warnings.Count -eq 0) {
+                    $warnings.Add("No required scopes declared by this pack.") | Out-Null
+                }
+                $insightPackWarningsText.Text = ($warnings -join "`n")
             }
 
             # Apply global defaults (only if the pack defines these params and the controls are empty)
@@ -6787,7 +6861,21 @@ function Run-SelectedInsightPack {
     }
 
     Ensure-OpsInsightsModuleLoaded
+    Ensure-OpsInsightsContext
     $packParams = Get-InsightPackParameterValues
+
+    $useCache = $false
+    if ($useInsightCacheCheckbox) { $useCache = [bool]$useInsightCacheCheckbox.IsChecked }
+    $cacheTtl = 60
+    if ($insightCacheTtlInput -and -not [string]::IsNullOrWhiteSpace($insightCacheTtlInput.Text)) {
+        try { $cacheTtl = [int]$insightCacheTtlInput.Text.Trim() } catch { $cacheTtl = 60 }
+    }
+    if ($cacheTtl -lt 1) { $cacheTtl = 1 }
+
+    $cacheDir = Join-Path -Path $UserProfileBase -ChildPath "GenesysApiExplorerCache\\OpsInsights"
+    if (-not (Test-Path -LiteralPath $cacheDir)) {
+        New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+    }
 
     if ($Compare) {
         $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams
@@ -6797,7 +6885,12 @@ function Run-SelectedInsightPack {
             $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -DryRun
         }
         else {
-            $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams
+            if ($useCache) {
+                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -UseCache -CacheTtlMinutes $cacheTtl -CacheDirectory $cacheDir
+            }
+            else {
+                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams
+            }
         }
     }
 

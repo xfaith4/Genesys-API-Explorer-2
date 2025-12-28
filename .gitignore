@@ -7,3 +7,7 @@ insights/briefings/*
 # Temporary exports / reports
 reports/
 *.snapshot.json
+
+# Pester / test artifacts
+testResults*.xml
+TestResults*.xml

@@ -9,37 +9,45 @@ function Get-GCConversationDetails {
     #>
   [CmdletBinding()]
   param(
+    [Parameter(Mandatory, ParameterSetName = 'ByQuery')]
+    [ValidateNotNullOrEmpty()]
+    [hashtable]$Query,
+
     # ISO interval string: "start/end" (UTC recommended)
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName = 'ByInterval')]
     [ValidateNotNullOrEmpty()]
     [string]$Interval,
 
-    [Parameter()]
+    [Parameter(ParameterSetName = 'ByInterval')]
     [int]$PageSize = 100,
 
-    [Parameter()]
+    [Parameter(ParameterSetName = 'ByInterval')]
     [string]$Cursor,
 
     # Optional body filters you may add later; PR2 keeps it flexible
-    [Parameter()]
+    [Parameter(ParameterSetName = 'ByInterval')]
     [hashtable]$Filter
   )
 
-  $path = "/api/v2/analytics/conversations/details?pageSize=$($PageSize)&interval=$([uri]::EscapeDataString($Interval))"
-  if ($Cursor) {
-    $path += "&cursor=$([uri]::EscapeDataString($Cursor))"
-  }
+  $path = '/api/v2/analytics/conversations/details/query'
 
-  $body = @{}
-  if ($Filter) { $body.filter = $Filter }
+  $body = if ($PSCmdlet.ParameterSetName -eq 'ByQuery') {
+    $Query
+  }
+  else {
+    $request = @{
+      interval = $Interval
+      paging   = @{ pageSize = $PageSize; pageNumber = 1 }
+    }
+
+    if ($Cursor) { $request.cursor = $Cursor }
+    if ($Filter) { $request.filter = $Filter }
+
+    $request
+  }
 
   $resp = Invoke-GCRequest -Method POST -Path $path -Body $body
 
-  # Normalize common response shape for callers
-  [pscustomobject]@{
-    Conversations = @($resp.conversations)
-    Cursor        = $resp.cursor
-    Raw           = $resp
-  }
+  return $resp
 }
 ### END FILE

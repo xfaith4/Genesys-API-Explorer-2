@@ -10,7 +10,17 @@ function Invoke-GCInsightPack {
         [hashtable]$Parameters,
 
         [Parameter()]
-        [switch]$DryRun
+        [switch]$DryRun,
+
+        [Parameter()]
+        [switch]$UseCache,
+
+        [Parameter()]
+        [ValidateRange(1, 43200)]
+        [int]$CacheTtlMinutes = 60,
+
+        [Parameter()]
+        [string]$CacheDirectory
     )
 
     $resolvedPackPath = Resolve-GCInsightPackPath -PackPath $PackPath
@@ -34,6 +44,21 @@ function Invoke-GCInsightPack {
         Drilldowns = New-Object System.Collections.ArrayList
         Steps      = New-Object System.Collections.ArrayList
         GeneratedUtc = (Get-Date).ToUniversalTime()
+    }
+
+    $effectiveCacheDir = $null
+    if ($UseCache -and (-not $DryRun)) {
+        $effectiveCacheDir = if ($CacheDirectory) { $CacheDirectory } else { Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath 'GenesysCloud.OpsInsights.Cache' }
+        if (-not (Test-Path -LiteralPath $effectiveCacheDir)) {
+            New-Item -ItemType Directory -Path $effectiveCacheDir -Force | Out-Null
+        }
+    }
+
+    function Get-CacheKeyHex {
+        param([Parameter(Mandatory)][string]$Value)
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+        $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
+        return ([System.BitConverter]::ToString($hash) -replace '-', '').ToLowerInvariant()
     }
 
     foreach ($step in @($pack.pipeline)) {
@@ -86,9 +111,47 @@ function Invoke-GCInsightPack {
                         $log.ResultSummary = "DRY RUN: HTTP $method → $pathWithQuery"
                     }
                     else {
-                        $response = Invoke-GCRequest @requestSplat
-                        $ctx.Data[$step.id] = $response
-                        $log.ResultSummary = "HTTP $method → $pathWithQuery (received status: $($response.statusCode -or 'OK'))"
+                        $cacheHit = $false
+                        $cachePath = $null
+                        if ($effectiveCacheDir) {
+                            $bodyJson = if ($body) { ($body | ConvertTo-Json -Depth 50) } else { '' }
+                            $cacheKey = Get-CacheKeyHex -Value ("{0}|{1}|{2}|{3}|{4}" -f $pack.id, $step.id, $method, $pathWithQuery, $bodyJson)
+                            $cachePath = Join-Path -Path $effectiveCacheDir -ChildPath ("{0}.json" -f $cacheKey)
+
+                            if (Test-Path -LiteralPath $cachePath) {
+                                $ageMinutes = ((Get-Date) - (Get-Item -LiteralPath $cachePath).LastWriteTime).TotalMinutes
+                                if ($ageMinutes -lt $CacheTtlMinutes) {
+                                    try {
+                                        $cachedRaw = Get-Content -LiteralPath $cachePath -Raw
+                                        if (-not [string]::IsNullOrWhiteSpace($cachedRaw)) {
+                                            $ctx.Data[$step.id] = ($cachedRaw | ConvertFrom-Json)
+                                            $cacheHit = $true
+                                        }
+                                    }
+                                    catch {
+                                        $cacheHit = $false
+                                    }
+                                }
+                            }
+                        }
+
+                        if ($cacheHit) {
+                            $log.ResultSummary = "CACHE HIT: HTTP $method → $pathWithQuery"
+                        }
+                        else {
+                            $response = Invoke-GCRequest @requestSplat
+                            $ctx.Data[$step.id] = $response
+                            $log.ResultSummary = "HTTP $method → $pathWithQuery (received status: $($response.statusCode -or 'OK'))"
+
+                            if ($cachePath) {
+                                try {
+                                    ($response | ConvertTo-Json -Depth 50) | Set-Content -LiteralPath $cachePath -Encoding utf8
+                                }
+                                catch {
+                                    # ignore cache write errors
+                                }
+                            }
+                        }
                     }
                 }
 

@@ -2,7 +2,11 @@
   "id": "gc.dataActions.failures.v1",
   "name": "Data Action Failure Hotspots",
   "version": "1.0.0",
+  "maturity": "alpha",
+  "owner": "Ops Insights",
+  "expectedRuntimeSec": 60,
   "description": "Finds the highest-impact Data Actions failures by time window and summarizes likely blast radius.",
+  "scopes": ["analytics:read"],
   "tags": [
     "data-actions",
     "integrations",
