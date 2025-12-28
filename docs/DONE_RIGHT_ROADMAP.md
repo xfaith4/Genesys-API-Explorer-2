@@ -21,7 +21,7 @@ UI-agnostic engine:
 ### UI app: `apps/OpsConsole`
 WPF/WinUI/Web (choose later). The UI calls module functions; it never directly `Invoke-RestMethod`.
 
-### Insight Packs: `insightpacks/*.json`
+### Insight Packs: `insights/packs/*.json`
 Versioned “dashboards as code”:
 - Questions answered
 - Required endpoints/scopes

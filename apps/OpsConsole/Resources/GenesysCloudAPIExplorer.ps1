@@ -4373,8 +4373,10 @@ function Join-FromScriptRoot {
     return Join-Path -Path $base -ChildPath $Child
 }
 
-$insightPackRoot = Join-FromScriptRoot -Levels 3 -Child 'insightpacks'
-$insightBriefingRoot = Join-FromScriptRoot -Levels 3 -Child 'InsightBriefings'
+$insightPackRoot = Join-FromScriptRoot -Levels 3 -Child 'insights/packs'
+$legacyInsightPackRoot = Join-FromScriptRoot -Levels 3 -Child 'insightpacks'
+$insightBriefingRoot = Join-FromScriptRoot -Levels 3 -Child 'insights/briefings'
+$legacyInsightBriefingRoot = Join-FromScriptRoot -Levels 3 -Child 'InsightBriefings'
 $script:OpsInsightsManifest = Join-FromScriptRoot -Levels 3 -Child 'src/GenesysCloud.OpsInsights/GenesysCloud.OpsInsights.psd1'
 $script:OpsInsightsModuleRoot = Split-Path -Parent $script:OpsInsightsManifest
 $script:OpsInsightsCoreManifest = Join-Path -Path $script:OpsInsightsModuleRoot -ChildPath '..\GenesysCloud.OpsInsights.Core\GenesysCloud.OpsInsights.Core.psd1'
@@ -5197,7 +5199,15 @@ function Get-InsightPackPath {
         throw "Insight pack file name is required."
     }
 
-    return Join-Path -Path $insightPackRoot -ChildPath $packName
+    $candidate = Join-Path -Path $insightPackRoot -ChildPath $packName
+    if (Test-Path -LiteralPath $candidate) { return $candidate }
+
+    if ($legacyInsightPackRoot) {
+        $legacyCandidate = Join-Path -Path $legacyInsightPackRoot -ChildPath $packName
+        if (Test-Path -LiteralPath $legacyCandidate) { return $legacyCandidate }
+    }
+
+    return $candidate
 }
 
 function Get-InsightBriefingDirectory {

@@ -1,0 +1,7 @@
+# Insight briefing exports (runtime artifacts)
+InsightBriefings/
+insights/briefings/
+
+# Temporary exports / reports
+reports/
+*.snapshot.json

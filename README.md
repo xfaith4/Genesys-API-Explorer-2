@@ -66,10 +66,10 @@ Export-GCConversationToExcel `
 
 ### Insight Packs & Evidence Briefings
 
-- The `insightpacks/` folder now defines curated workflows such as `gc.queues.smoke.v1` and `gc.dataActions.failures.v1`. Run any pack with:
+- The `insights/packs/` folder defines curated workflows such as `gc.queues.smoke.v1` and `gc.dataActions.failures.v1`. Run any pack with:
 
   ```powershell
-  $result = Invoke-GCInsightPack -PackPath .\insightpacks\gc.queues.smoke.v1.json -Parameters @{ startDate = '2025-12-01T00:00:00Z'; endDate = '2025-12-08T00:00:00Z' }
+  $result = Invoke-GCInsightPack -PackPath .\insights\packs\gc.queues.smoke.v1.json -Parameters @{ startDate = '2025-12-01T00:00:00Z'; endDate = '2025-12-08T00:00:00Z' }
   ```
 
   Each result includes computed metrics, drilldowns, and an `Evidence` property containing narrative context.

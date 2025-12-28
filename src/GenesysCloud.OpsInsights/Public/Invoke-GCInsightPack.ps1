@@ -10,15 +10,17 @@ function Invoke-GCInsightPack {
         [hashtable]$Parameters
     )
 
-    if (-not (Test-Path -LiteralPath $PackPath)) {
+    $resolvedPackPath = Resolve-GCInsightPackPath -PackPath $PackPath
+    if (-not (Test-Path -LiteralPath $resolvedPackPath)) {
         throw "Insight pack not found: $PackPath"
     }
 
     if ($null -eq $Parameters) { $Parameters = @{} }
 
-    $packJson = Get-Content -LiteralPath $PackPath -Raw
+    $packJson = Get-Content -LiteralPath $resolvedPackPath -Raw
     $pack = $packJson | ConvertFrom-Json
 
+    Test-GCInsightPackDefinition -Pack $pack | Out-Null
     $resolvedParameters = Get-GCInsightPackParameters -Pack $pack -Overrides $Parameters
 
     $ctx = [pscustomobject]@{
