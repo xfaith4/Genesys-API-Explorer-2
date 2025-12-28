@@ -69,7 +69,8 @@ $publicFunctions = @(
     'Set-GCInvoker',
     'Show-GCConversationTimelineUI',
     'Start-GCTrace',
-    'Stop-GCTrace'
+    'Stop-GCTrace',
+    'Test-GCInsightPack'
 )
 
 Export-ModuleMember -Function $publicFunctions

@@ -4,7 +4,7 @@ This is a working checklist for making Insight Packs more powerful and the resul
 
 ## Pack authoring & validation
 
-- [ ] Add typed parameter definitions (`type`, `required`, `default`, `description`) across existing packs and UI parameter capture.
+- [x] Add typed parameter definitions (`type`, `required`, `default`, `description`) across existing packs and UI parameter capture.
 - [ ] Validate packs against `insights/schema/insightpack.schema.json` (optional strict mode).
 - [x] Add a `dryRun` mode: resolve templates + show planned requests without calling APIs.
 - [x] Add baseline comparison runner (previous window) for packs that accept `startDate`/`endDate`.
@@ -12,13 +12,13 @@ This is a working checklist for making Insight Packs more powerful and the resul
 - [x] Ensure Ops Insights runs use the UI OAuth token (no hidden global state).
 - [x] Display pack metadata (tags/scopes/endpoints) in the Ops Console.
 - [x] Add file+TTL caching for `gcRequest` steps (opt-in) to speed up weekly/monthly packs.
-- [ ] Standardize pack metadata: `owner`, `maturity`, `expectedRuntimeSec`, `scopes` (add across all packs).
+- [x] Standardize pack metadata: `owner`, `maturity`, `expectedRuntimeSec`, `scopes` (add across all packs).
 
 ## Pipeline engine features
 
-- [ ] Add `assert` step type (fail fast with a clear message when expected conditions are not met).
-- [ ] Add `foreach` step type to fan out requests/computations across a list.
-- [ ] Add `paginate`/`jobPoll` helpers for analytics jobs endpoints.
+- [x] Add `assert` step type (fail fast with a clear message when expected conditions are not met).
+- [x] Add `foreach` step type to fan out requests/computations across a list.
+- [x] Add `jobPoll` helper step type for analytics jobs endpoints.
 - [ ] Add `cache` step type (file cache keyed by pack id + params + timeframe).
 - [ ] Add `join` helpers for enriching IDs to names (queues/users/data actions).
 
@@ -34,13 +34,14 @@ This is a working checklist for making Insight Packs more powerful and the resul
 - [x] Pack testing harness (`Invoke-GCInsightPackTest`) with fixtures + snapshot assertions for computed metrics.
 - [x] Append export entries to a briefings `index.json` for lightweight run history.
 - [x] Load and browse briefing history from `index.json` in the Ops Console.
+- [x] Optional strict pack validation (`Test-GCInsightPack`, UI toggle).
 
 ## Next steps (Phase 1)
 
-- [ ] Add a “time window” picker (WoW/MoM presets) that feeds `startDate`/`endDate` for packs.
-- [ ] Improve briefing HTML for compare runs (deltas, highlights, and “what changed” narrative).
-- [ ] Add a basic pack “Examples” area (recommended params + expected runtime) shown in the catalog.
-- [ ] Finish migrating packs to typed parameters (including validation + friendly errors).
+- [x] Add a “time window” picker (WoW/MoM presets) that feeds `startDate`/`endDate` for packs.
+- [x] Improve briefing HTML for compare runs (deltas, highlights, and “what changed” narrative).
+- [x] Add a basic pack “Examples” area (recommended params + expected runtime) shown in the catalog.
+- [ ] Add stronger pack validation + friendly parameter errors (schema strict mode).
 
 ## Packs added (initial set)
 

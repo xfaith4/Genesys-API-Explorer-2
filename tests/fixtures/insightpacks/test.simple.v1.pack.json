@@ -16,10 +16,15 @@
       "uri": "/api/v2/users/me"
     },
     {
+      "id": "assertMeName",
+      "type": "assert",
+      "message": "Expected fixture user name to be 'Test User'.",
+      "script": "param($ctx)\nreturn ($ctx.Data.me.name -eq 'Test User')\n"
+    },
+    {
       "id": "metricMe",
       "type": "metric",
       "script": "param($ctx)\n[pscustomobject]@{ title='Me'; value=$ctx.Data.me.name; items=@() }\n"
     }
   ]
 }
-

@@ -8,6 +8,16 @@
   "description": "Ranks Data Actions by failures for a time window and enriches results with action + integration metadata and response-code breakdowns.",
   "scopes": ["analytics:read", "integrations:read"],
   "tags": ["data-actions", "integrations", "reliability", "triage"],
+  "examples": [
+    {
+      "title": "Hourly failures with enrichment",
+      "notes": "Use the UI Window preset to set start/end; this example sets granularity + topN.",
+      "parameters": {
+        "granularity": "PT1H",
+        "topN": 10
+      }
+    }
+  ],
   "parameters": {
     "startDate": {
       "type": "string",
@@ -19,10 +29,10 @@
       "required": true,
       "description": "ISO-8601 UTC end timestamp (e.g. 2025-12-08T00:00:00Z)."
     },
-    "interval": {
+    "granularity": {
       "type": "string",
       "default": "PT1H",
-      "description": "Analytics aggregation interval (e.g. PT15M, PT1H, P1D)."
+      "description": "Analytics aggregation granularity (e.g. PT15M, PT1H, P1D)."
     },
     "topN": {
       "type": "int",
@@ -37,7 +47,8 @@
       "method": "POST",
       "uri": "/api/v2/analytics/actions/aggregates/query",
       "bodyTemplate": {
-        "interval": "{{interval}}",
+        "interval": "{{startDate}}/{{endDate}}",
+        "granularity": "{{granularity}}",
         "filter": {
           "type": "or",
           "clauses": []
@@ -58,7 +69,8 @@
       "method": "POST",
       "uri": "/api/v2/analytics/actions/aggregates/query",
       "bodyTemplate": {
-        "interval": "{{interval}}",
+        "interval": "{{startDate}}/{{endDate}}",
+        "granularity": "{{granularity}}",
         "filter": {
           "type": "or",
           "clauses": []

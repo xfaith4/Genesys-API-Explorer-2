@@ -13,6 +13,9 @@ function Invoke-GCInsightPackCompare {
         [hashtable]$BaselineParameters,
 
         [Parameter()]
+        [switch]$StrictValidation,
+
+        [Parameter()]
         [ValidateSet('PreviousWindow', 'ShiftDays')]
         [string]$BaselineMode = 'PreviousWindow',
 
@@ -45,8 +48,8 @@ function Invoke-GCInsightPackCompare {
         }
     }
 
-    $current = Invoke-GCInsightPack -PackPath $PackPath -Parameters $Parameters
-    $baseline = Invoke-GCInsightPack -PackPath $PackPath -Parameters $BaselineParameters
+    $current = Invoke-GCInsightPack -PackPath $PackPath -Parameters $Parameters -StrictValidation:$StrictValidation
+    $baseline = Invoke-GCInsightPack -PackPath $PackPath -Parameters $BaselineParameters -StrictValidation:$StrictValidation
 
     $metricComparisons = Compare-GCInsightMetrics -CurrentResult $current -BaselineResult $baseline
 

@@ -63,6 +63,18 @@ function Get-InsightPackCatalog {
                 $pack = $raw | ConvertFrom-Json
                 if (-not $pack -or -not $pack.id) { return }
 
+                $examples = @()
+                if ($pack -and ($pack.PSObject.Properties.Name -contains 'examples') -and $pack.examples) {
+                    foreach ($ex in @($pack.examples)) {
+                        if (-not $ex) { continue }
+                        $examples += [pscustomobject]@{
+                            Title      = [string]($ex.title ?? $ex.name ?? 'Example')
+                            Notes      = [string]($ex.notes ?? '')
+                            Parameters = $ex.parameters
+                        }
+                    }
+                }
+
                 $items.Add([pscustomobject]@{
                     Id          = [string]$pack.id
                     Name        = [string]($pack.name ?? $pack.id)
@@ -74,6 +86,7 @@ function Get-InsightPackCatalog {
                     ExpectedRuntimeSec = if ($pack.PSObject.Properties.Name -contains 'expectedRuntimeSec') { $pack.expectedRuntimeSec } else { $null }
                     Tags        = @($pack.tags)
                     Endpoints   = @(@($pack.pipeline) | Where-Object { $_ -and $_.type -and ($_.type.ToString().ToLowerInvariant() -eq 'gcrequest') } | ForEach-Object { $_.uri ?? $_.path } | Where-Object { $_ })
+                    Examples    = $examples
                     FileName    = $_.Name
                     FullPath    = $_.FullName
                     Pack        = $pack
@@ -87,6 +100,70 @@ function Get-InsightPackCatalog {
     }
 
     return @($items | Sort-Object Name, Id)
+}
+
+function Get-InsightTimePresets {
+    return @(
+        [pscustomobject]@{ Key = 'last7';  Name = 'Last 7 days (ending now)' },
+        [pscustomobject]@{ Key = 'last30'; Name = 'Last 30 days (ending now)' },
+        [pscustomobject]@{ Key = 'thisWeek'; Name = 'This week (Mon 00:00 → now, UTC)' },
+        [pscustomobject]@{ Key = 'lastWeek'; Name = 'Last full week (Mon → Mon, UTC)' },
+        [pscustomobject]@{ Key = 'thisMonth'; Name = 'This month (1st 00:00 → now, UTC)' },
+        [pscustomobject]@{ Key = 'lastMonth'; Name = 'Last full month (1st → 1st, UTC)' }
+    )
+}
+
+function Resolve-InsightUtcWindowFromPreset {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$PresetKey
+    )
+
+    $now = (Get-Date).ToUniversalTime()
+
+    function Start-OfWeekUtc {
+        param([datetime]$UtcNow)
+
+        $dow = [int]$UtcNow.DayOfWeek
+        $mondayIndex = 1
+        $daysSinceMonday = ($dow - $mondayIndex)
+        if ($daysSinceMonday -lt 0) { $daysSinceMonday += 7 }
+        $start = $UtcNow.Date.AddDays(-1 * $daysSinceMonday)
+        return [datetime]::SpecifyKind($start, [System.DateTimeKind]::Utc)
+    }
+
+    function Start-OfMonthUtc {
+        param([datetime]$UtcNow)
+        $start = New-Object datetime($UtcNow.Year, $UtcNow.Month, 1, 0, 0, 0)
+        return [datetime]::SpecifyKind($start, [System.DateTimeKind]::Utc)
+    }
+
+    switch ($PresetKey) {
+        'last7' {
+            return [pscustomobject]@{ StartUtc = $now.AddDays(-7); EndUtc = $now }
+        }
+        'last30' {
+            return [pscustomobject]@{ StartUtc = $now.AddDays(-30); EndUtc = $now }
+        }
+        'thisWeek' {
+            return [pscustomobject]@{ StartUtc = (Start-OfWeekUtc -UtcNow $now); EndUtc = $now }
+        }
+        'lastWeek' {
+            $thisWeekStart = Start-OfWeekUtc -UtcNow $now
+            return [pscustomobject]@{ StartUtc = $thisWeekStart.AddDays(-7); EndUtc = $thisWeekStart }
+        }
+        'thisMonth' {
+            return [pscustomobject]@{ StartUtc = (Start-OfMonthUtc -UtcNow $now); EndUtc = $now }
+        }
+        'lastMonth' {
+            $thisMonthStart = Start-OfMonthUtc -UtcNow $now
+            return [pscustomobject]@{ StartUtc = $thisMonthStart.AddMonths(-1); EndUtc = $thisMonthStart }
+        }
+        default {
+            throw "Unknown time preset key: $PresetKey"
+        }
+    }
 }
 
 function New-InsightPackParameterRow {
@@ -5014,6 +5091,8 @@ $Xaml = @"
                   <Button Name="DryRunSelectedInsightPackButton" Width="110" Height="30" Content="Dry Run" Margin="10 0 0 0"/>
                   <CheckBox Name="UseInsightCacheCheckbox" Content="Cache" VerticalAlignment="Center" Margin="14 0 0 0" IsChecked="True"
                             ToolTip="Cache gcRequest steps to disk (file+TTL)"/>
+                  <CheckBox Name="StrictInsightValidationCheckbox" Content="Strict validate" VerticalAlignment="Center" Margin="12 0 0 0" IsChecked="False"
+                            ToolTip="Enable stricter pack validation before running (schema-ish checks)."/>
                   <TextBlock Text="TTL (min)" VerticalAlignment="Center" Margin="10 0 6 0" Foreground="SlateGray"/>
                   <TextBox Name="InsightCacheTtlInput" Width="60" Height="26" VerticalContentAlignment="Center" Text="60"
                            ToolTip="Cache time-to-live in minutes"/>
@@ -5028,8 +5107,20 @@ $Xaml = @"
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
-                  <TextBlock Grid.Column="0" Name="InsightPackDescriptionText"
-                             Text="Select a pack to view parameters." TextWrapping="Wrap" Foreground="Gray"/>
+                  <StackPanel Grid.Column="0" Orientation="Vertical">
+                    <TextBlock Name="InsightPackDescriptionText"
+                               Text="Select a pack to view parameters." TextWrapping="Wrap" Foreground="Gray" />
+                    <StackPanel Orientation="Horizontal" Margin="0 6 0 0">
+                      <TextBlock Text="Window" VerticalAlignment="Center" Foreground="SlateGray" Margin="0 0 8 0"/>
+                      <ComboBox Name="InsightTimePresetCombo" Width="260" Height="26" VerticalContentAlignment="Center"
+                                ToolTip="Quick time window presets (UTC)"/>
+                      <Button Name="ApplyInsightTimePresetButton" Width="110" Height="26" Content="Apply" Margin="10 0 0 0"/>
+                      <TextBlock Text="Example" VerticalAlignment="Center" Foreground="SlateGray" Margin="16 0 8 0"/>
+                      <ComboBox Name="InsightPackExampleCombo" Width="260" Height="26" VerticalContentAlignment="Center"
+                                ToolTip="Pack-provided example parameter presets"/>
+                      <Button Name="LoadInsightPackExampleButton" Width="110" Height="26" Content="Load" Margin="10 0 0 0"/>
+                    </StackPanel>
+                  </StackPanel>
                   <TextBlock Grid.Column="1" Text="Start (UTC)" VerticalAlignment="Center" Margin="12 0 8 0" Foreground="SlateGray"/>
                   <TextBox Grid.Column="2" Name="InsightGlobalStartInput" Width="220" Height="26" VerticalContentAlignment="Center"
                            ToolTip="Default startDate for packs that define startDate (ISO-8601 UTC)"/>
@@ -5262,12 +5353,17 @@ $clearHistoryButton = $Window.FindName("ClearHistoryButton")
  $compareSelectedInsightPackButton = $Window.FindName("CompareSelectedInsightPackButton")
  $dryRunSelectedInsightPackButton = $Window.FindName("DryRunSelectedInsightPackButton")
  $useInsightCacheCheckbox = $Window.FindName("UseInsightCacheCheckbox")
+ $strictInsightValidationCheckbox = $Window.FindName("StrictInsightValidationCheckbox")
  $insightCacheTtlInput = $Window.FindName("InsightCacheTtlInput")
  $insightPackCombo = $Window.FindName("InsightPackCombo")
  $insightPackDescriptionText = $Window.FindName("InsightPackDescriptionText")
  $insightPackMetaText = $Window.FindName("InsightPackMetaText")
  $insightPackWarningsText = $Window.FindName("InsightPackWarningsText")
  $insightPackParametersPanel = $Window.FindName("InsightPackParametersPanel")
+ $insightTimePresetCombo = $Window.FindName("InsightTimePresetCombo")
+ $applyInsightTimePresetButton = $Window.FindName("ApplyInsightTimePresetButton")
+ $insightPackExampleCombo = $Window.FindName("InsightPackExampleCombo")
+ $loadInsightPackExampleButton = $Window.FindName("LoadInsightPackExampleButton")
  $insightGlobalStartInput = $Window.FindName("InsightGlobalStartInput")
  $insightGlobalEndInput = $Window.FindName("InsightGlobalEndInput")
  $exportInsightBriefingButton = $Window.FindName("ExportInsightBriefingButton")
@@ -6780,14 +6876,14 @@ if ($insightPackCombo) {
     $insightPackCombo.ItemsSource = $script:InsightPackCatalog
     $insightPackCombo.DisplayMemberPath = 'Display'
 
-    $insightPackCombo.Add_SelectionChanged({
+	    $insightPackCombo.Add_SelectionChanged({
             $selected = $insightPackCombo.SelectedItem
             if (-not $selected) { return }
 
             if ($insightPackDescriptionText) {
                 $insightPackDescriptionText.Text = if ($selected.Description) { $selected.Description } else { $selected.Id }
             }
-            if ($insightPackMetaText) {
+	            if ($insightPackMetaText) {
                 $tags = if ($selected.Tags -and $selected.Tags.Count -gt 0) { ($selected.Tags -join ', ') } else { '' }
                 $scopes = if ($selected.Scopes -and $selected.Scopes.Count -gt 0) { ($selected.Scopes -join ', ') } else { '' }
                 $endpoints = if ($selected.Endpoints -and $selected.Endpoints.Count -gt 0) { ($selected.Endpoints -join "`n") } else { '' }
@@ -6800,28 +6896,60 @@ if ($insightPackCombo) {
                 if ($tags) { $lines.Add("Tags: $tags") | Out-Null }
                 if ($scopes) { $lines.Add("Scopes: $scopes") | Out-Null }
                 if ($selected.FullPath) { $lines.Add("Path: $($selected.FullPath)") | Out-Null }
-                if ($endpoints) {
-                    $lines.Add("Endpoints:") | Out-Null
-                    $lines.Add($endpoints) | Out-Null
-                }
-                $insightPackMetaText.Text = ($lines -join "`n")
-            }
+	                if ($endpoints) {
+	                    $lines.Add("Endpoints:") | Out-Null
+	                    $lines.Add($endpoints) | Out-Null
+	                }
+	                if ($selected.Examples -and $selected.Examples.Count -gt 0) {
+	                    $lines.Add("Examples:") | Out-Null
+	                    foreach ($ex in @($selected.Examples)) {
+	                        if (-not $ex) { continue }
+	                        $note = if ($ex.Notes) { " — $($ex.Notes)" } else { '' }
+	                        $lines.Add("  - $($ex.Title)$note") | Out-Null
+	                    }
+	                }
+	                $insightPackMetaText.Text = ($lines -join "`n")
+	            }
             if ($insightPackParametersPanel) {
                 Render-InsightPackParameters -Pack $selected.Pack -Panel $insightPackParametersPanel
             }
 
-            if ($insightPackWarningsText) {
-                $warnings = New-Object System.Collections.Generic.List[string]
-                if ($selected.Scopes -and $selected.Scopes.Count -gt 0) {
-                    $warnings.Add("Requires OAuth scopes: $($selected.Scopes -join ', ')") | Out-Null
-                }
-                if ($warnings.Count -eq 0) {
-                    $warnings.Add("No required scopes declared by this pack.") | Out-Null
-                }
-                $insightPackWarningsText.Text = ($warnings -join "`n")
-            }
+	            if ($insightPackWarningsText) {
+	                $warnings = New-Object System.Collections.Generic.List[string]
+	                if ($selected.Scopes -and $selected.Scopes.Count -gt 0) {
+	                    $warnings.Add("Requires OAuth scopes: $($selected.Scopes -join ', ')") | Out-Null
+	                }
+	                if ($warnings.Count -eq 0) {
+	                    $warnings.Add("No required scopes declared by this pack.") | Out-Null
+	                }
 
-            # Apply global defaults (only if the pack defines these params and the controls are empty)
+	                # Optional strict validation (surface issues early without blocking selection)
+	                try {
+	                    Ensure-OpsInsightsModuleLoaded
+	                    $strict = $false
+	                    if ($strictInsightValidationCheckbox) { $strict = [bool]$strictInsightValidationCheckbox.IsChecked }
+	                    $validation = Test-GCInsightPack -PackPath $selected.FullPath -Strict:$strict
+	                    if ($validation -and -not $validation.IsValid -and $validation.Errors -and $validation.Errors.Count -gt 0) {
+	                        $warnings.Add("Validation: $($validation.Errors[0])") | Out-Null
+	                    }
+	                }
+	                catch {
+	                    $warnings.Add("Validation: $($_.Exception.Message)") | Out-Null
+	                }
+	                $insightPackWarningsText.Text = ($warnings -join "`n")
+	            }
+
+	            if ($insightPackExampleCombo) {
+	                $insightPackExampleCombo.ItemsSource = @($selected.Examples)
+	                $insightPackExampleCombo.DisplayMemberPath = 'Title'
+	                $insightPackExampleCombo.IsEnabled = ($selected.Examples -and $selected.Examples.Count -gt 0)
+	                if ($insightPackExampleCombo.IsEnabled) { $insightPackExampleCombo.SelectedIndex = 0 }
+	            }
+	            if ($loadInsightPackExampleButton) {
+	                $loadInsightPackExampleButton.IsEnabled = ($selected.Examples -and $selected.Examples.Count -gt 0)
+	            }
+
+	            # Apply global defaults (only if the pack defines these params and the controls are empty)
             if ($script:InsightParamInputs.ContainsKey('startDate') -and $insightGlobalStartInput -and -not [string]::IsNullOrWhiteSpace($insightGlobalStartInput.Text)) {
                 $ctrl = $script:InsightParamInputs['startDate']
                 if ($ctrl -is [System.Windows.Controls.TextBox] -and [string]::IsNullOrWhiteSpace($ctrl.Text)) {
@@ -6836,9 +6964,96 @@ if ($insightPackCombo) {
             }
         })
 
-    if ($script:InsightPackCatalog.Count -gt 0) {
-        $insightPackCombo.SelectedIndex = 0
+	    if ($script:InsightPackCatalog.Count -gt 0) {
+	        $insightPackCombo.SelectedIndex = 0
+	    }
+	}
+
+if ($insightTimePresetCombo) {
+    $insightTimePresetCombo.ItemsSource = @(Get-InsightTimePresets)
+    $insightTimePresetCombo.DisplayMemberPath = 'Name'
+    $insightTimePresetCombo.SelectedValuePath = 'Key'
+    $insightTimePresetCombo.SelectedValue = 'last7'
+}
+
+function Apply-InsightTimePresetToUi {
+    param(
+        [Parameter(Mandatory)]
+        [string]$PresetKey
+    )
+
+    $window = Resolve-InsightUtcWindowFromPreset -PresetKey $PresetKey
+    $startIso = $window.StartUtc.ToString('o')
+    $endIso = $window.EndUtc.ToString('o')
+
+    if ($insightGlobalStartInput) { $insightGlobalStartInput.Text = $startIso }
+    if ($insightGlobalEndInput) { $insightGlobalEndInput.Text = $endIso }
+
+    if ($script:InsightParamInputs.ContainsKey('startDate')) {
+        $ctrl = $script:InsightParamInputs['startDate']
+        if ($ctrl -is [System.Windows.Controls.TextBox]) { $ctrl.Text = $startIso }
     }
+    if ($script:InsightParamInputs.ContainsKey('endDate')) {
+        $ctrl = $script:InsightParamInputs['endDate']
+        if ($ctrl -is [System.Windows.Controls.TextBox]) { $ctrl.Text = $endIso }
+    }
+}
+
+if ($insightTimePresetCombo -and $insightGlobalStartInput -and $insightGlobalEndInput) {
+    if ([string]::IsNullOrWhiteSpace($insightGlobalStartInput.Text) -and [string]::IsNullOrWhiteSpace($insightGlobalEndInput.Text)) {
+        try {
+            $key = [string]$insightTimePresetCombo.SelectedValue
+            if (-not [string]::IsNullOrWhiteSpace($key)) {
+                Apply-InsightTimePresetToUi -PresetKey $key
+            }
+        }
+        catch {
+            # ignore default preset failures
+        }
+    }
+}
+
+if ($applyInsightTimePresetButton) {
+    $applyInsightTimePresetButton.Add_Click({
+            try {
+                $key = if ($insightTimePresetCombo) { [string]$insightTimePresetCombo.SelectedValue } else { '' }
+                if ([string]::IsNullOrWhiteSpace($key)) { return }
+                Apply-InsightTimePresetToUi -PresetKey $key
+            }
+            catch {
+                Add-LogEntry "Failed to apply time preset: $($_.Exception.Message)"
+            }
+        })
+}
+
+if ($loadInsightPackExampleButton) {
+    $loadInsightPackExampleButton.Add_Click({
+            try {
+                if (-not $insightPackExampleCombo -or -not $insightPackExampleCombo.SelectedItem) { return }
+                $example = $insightPackExampleCombo.SelectedItem
+                if (-not $example -or -not $example.Parameters) { return }
+
+                $paramObject = $example.Parameters
+                foreach ($prop in @($paramObject.PSObject.Properties)) {
+                    $name = $prop.Name
+                    $value = $prop.Value
+                    if (-not $script:InsightParamInputs.ContainsKey($name)) { continue }
+                    $ctrl = $script:InsightParamInputs[$name]
+
+                    if ($ctrl -is [System.Windows.Controls.CheckBox]) {
+                        $ctrl.IsChecked = [bool]$value
+                        continue
+                    }
+                    if ($ctrl -is [System.Windows.Controls.TextBox]) {
+                        if ($null -eq $value) { $ctrl.Text = '' }
+                        else { $ctrl.Text = [string]$value }
+                    }
+                }
+            }
+            catch {
+                Add-LogEntry "Failed to load pack example: $($_.Exception.Message)"
+            }
+        })
 }
 
 function Run-SelectedInsightPack {
@@ -6864,12 +7079,14 @@ function Run-SelectedInsightPack {
     Ensure-OpsInsightsContext
     $packParams = Get-InsightPackParameterValues
 
-    $useCache = $false
-    if ($useInsightCacheCheckbox) { $useCache = [bool]$useInsightCacheCheckbox.IsChecked }
-    $cacheTtl = 60
-    if ($insightCacheTtlInput -and -not [string]::IsNullOrWhiteSpace($insightCacheTtlInput.Text)) {
-        try { $cacheTtl = [int]$insightCacheTtlInput.Text.Trim() } catch { $cacheTtl = 60 }
-    }
+	    $useCache = $false
+	    if ($useInsightCacheCheckbox) { $useCache = [bool]$useInsightCacheCheckbox.IsChecked }
+	    $strictValidate = $false
+	    if ($strictInsightValidationCheckbox) { $strictValidate = [bool]$strictInsightValidationCheckbox.IsChecked }
+	    $cacheTtl = 60
+	    if ($insightCacheTtlInput -and -not [string]::IsNullOrWhiteSpace($insightCacheTtlInput.Text)) {
+	        try { $cacheTtl = [int]$insightCacheTtlInput.Text.Trim() } catch { $cacheTtl = 60 }
+	    }
     if ($cacheTtl -lt 1) { $cacheTtl = 1 }
 
     $cacheDir = Join-Path -Path $UserProfileBase -ChildPath "GenesysApiExplorerCache\\OpsInsights"
@@ -6877,22 +7094,22 @@ function Run-SelectedInsightPack {
         New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
     }
 
-    if ($Compare) {
-        $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams
-    }
-    else {
-        if ($DryRun) {
-            $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -DryRun
-        }
-        else {
-            if ($useCache) {
-                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -UseCache -CacheTtlMinutes $cacheTtl -CacheDirectory $cacheDir
-            }
-            else {
-                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams
-            }
-        }
-    }
+	    if ($Compare) {
+	        $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -StrictValidation:$strictValidate
+	    }
+	    else {
+	        if ($DryRun) {
+	            $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -DryRun -StrictValidation:$strictValidate
+	        }
+	        else {
+	            if ($useCache) {
+	                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -UseCache -CacheTtlMinutes $cacheTtl -CacheDirectory $cacheDir -StrictValidation:$strictValidate
+	            }
+	            else {
+	                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -StrictValidation:$strictValidate
+	            }
+	        }
+	    }
 
     $script:LastInsightResult = $result
     Update-InsightPackUi -Result $result

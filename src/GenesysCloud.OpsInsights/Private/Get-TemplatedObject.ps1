@@ -15,8 +15,11 @@ function Get-TemplatedObject {
     $json = ($Template | ConvertTo-Json -Depth 80)
 
     foreach ($k in ($Parameters.Keys | Sort-Object -Descending)) {
-        $token = "{{{0}}}" -f $k
-        $json = $json -replace [regex]::Escape($token), [string]$Parameters[$k]
+        $value = if ($Parameters[$k] -eq $null) { '' } else { [string]$Parameters[$k] }
+        $tokenDouble = '{{' + [string]$k + '}}'
+        $tokenSingle = '{' + [string]$k + '}'
+        $json = $json -replace [regex]::Escape($tokenDouble), $value
+        $json = $json -replace [regex]::Escape($tokenSingle), $value
     }
 
     $json | ConvertFrom-Json

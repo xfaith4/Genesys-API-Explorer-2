@@ -107,13 +107,53 @@ function Resolve-GCInsightPackPath {
 function Test-GCInsightPackDefinition {
     param(
         [Parameter(Mandatory)]
-        [pscustomobject]$Pack
+        [pscustomobject]$Pack,
+
+        [Parameter()]
+        [switch]$Strict
     )
 
     if (-not $Pack.id) { throw "Insight pack is missing 'id'." }
     if (-not $Pack.name) { throw "Insight pack '$($Pack.id)' is missing 'name'." }
     if (-not $Pack.version) { throw "Insight pack '$($Pack.id)' is missing 'version'." }
     if (-not $Pack.pipeline) { throw "Insight pack '$($Pack.id)' is missing 'pipeline'." }
+
+    if ($Strict) {
+        if ($Pack.maturity) {
+            $m = [string]$Pack.maturity
+            if ($m -notin @('alpha','beta','stable','deprecated')) {
+                throw "Insight pack '$($Pack.id)' has invalid maturity '$m' (allowed: alpha, beta, stable, deprecated)."
+            }
+        }
+        if ($null -ne $Pack.expectedRuntimeSec) {
+            try { [void][int]$Pack.expectedRuntimeSec } catch { throw "Insight pack '$($Pack.id)' expectedRuntimeSec must be an integer." }
+        }
+        foreach ($arrField in @('scopes','tags','owners')) {
+            if ($Pack.PSObject.Properties.Name -contains $arrField -and $null -ne $Pack.$arrField) {
+                if (-not ($Pack.$arrField -is [System.Collections.IEnumerable])) {
+                    throw "Insight pack '$($Pack.id)' field '$arrField' must be an array."
+                }
+            }
+        }
+
+        if ($Pack.parameters) {
+            foreach ($prop in $Pack.parameters.PSObject.Properties) {
+                $name = [string]$prop.Name
+                $def = $prop.Value
+                if ($def -is [psobject]) {
+                    $names = @($def.PSObject.Properties.Name)
+                    $isSchema = ($names -contains 'type') -or ($names -contains 'required') -or ($names -contains 'default') -or ($names -contains 'description')
+                    if ($isSchema -and ($names -contains 'type') -and $def.type) {
+                        $t = ([string]$def.type).ToLowerInvariant()
+                        $allowed = @('string','int','number','bool','datetime','timespan','array','object')
+                        if ($t -notin $allowed) {
+                            throw "Insight pack '$($Pack.id)' parameter '$name' has unsupported type '$t' (allowed: $($allowed -join ', '))."
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     $stepIds = @{}
     foreach ($step in @($Pack.pipeline)) {
@@ -123,9 +163,21 @@ function Test-GCInsightPackDefinition {
         if (-not $step.type) { throw "Insight pack step '$($step.id)' is missing 'type'." }
 
         $type = ([string]$step.type).ToLowerInvariant()
+        if ($Strict) {
+            $allowedTypes = @('gcrequest','compute','metric','drilldown','assert','foreach','jobpoll')
+            if ($type -notin $allowedTypes) {
+                throw "Insight pack '$($Pack.id)' step '$($step.id)' has unsupported type '$type' (allowed: $($allowedTypes -join ', '))."
+            }
+        }
         switch ($type) {
             'gcrequest' {
                 if (-not ($step.uri -or $step.path)) { throw "gcRequest step '$($step.id)' requires 'uri' or 'path'." }
+                if ($step.method) {
+                    $method = ([string]$step.method).ToUpperInvariant()
+                    if ($method -notin @('GET','POST','PUT','PATCH','DELETE')) {
+                        throw "gcRequest step '$($step.id)' has unsupported method '$method'."
+                    }
+                }
             }
             'compute' {
                 if (-not $step.script) { throw "Compute step '$($step.id)' requires a script block." }
@@ -136,6 +188,22 @@ function Test-GCInsightPackDefinition {
             'drilldown' {
                 if (-not $step.script) { throw "Drilldown step '$($step.id)' requires a script block." }
             }
+            'assert' {
+                if (-not $step.script) { throw "Assert step '$($step.id)' requires a script block that returns `$true/`$false." }
+                if ($step.message -and -not ($step.message -is [string])) { throw "Assert step '$($step.id)' message must be a string." }
+            }
+            'foreach' {
+                if (-not $step.itemsScript) { throw "Foreach step '$($step.id)' requires 'itemsScript'." }
+                if (-not $step.itemScript) { throw "Foreach step '$($step.id)' requires 'itemScript'." }
+            }
+            'jobpoll' {
+                if (-not $step.create) { throw "JobPoll step '$($step.id)' requires 'create' definition." }
+            }
+        }
+
+        if ($Strict -and $step.script) {
+            try { [void][scriptblock]::Create([string]$step.script) }
+            catch { throw "Insight pack '$($Pack.id)' step '$($step.id)' has an invalid script block: $($_.Exception.Message)" }
         }
     }
 
@@ -154,9 +222,11 @@ function Resolve-GCInsightTemplateString {
 
     $result = $Template
     foreach ($paramName in $Parameters.Keys) {
-        $token = "{{{0}}}" -f $paramName
         $value = if ($Parameters[$paramName] -eq $null) { '' } else { [string]$Parameters[$paramName] }
-        $result = $result -replace [regex]::Escape($token), $value
+        $tokenDouble = '{{' + [string]$paramName + '}}'
+        $tokenSingle = '{' + [string]$paramName + '}'
+        $result = $result -replace [regex]::Escape($tokenDouble), $value
+        $result = $result -replace [regex]::Escape($tokenSingle), $value
     }
 
     return $result
