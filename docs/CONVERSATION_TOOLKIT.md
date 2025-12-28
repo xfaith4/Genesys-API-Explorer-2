@@ -612,7 +612,7 @@ GenesysCloud.ConversationToolkit/
 
 ### Internal Components
 - **Invoke-GCRequest** - Centralized HTTP request wrapper (module-level helper)
-- **Add-TimelineEvent** - Timeline event normalization (private helper)
+- **Add-TimelineEvent** - Timeline event normalization (local helper within `Get-GCConversationTimeline`)
 - **6 Exported Functions** - Public API
 
 ### Data Flow

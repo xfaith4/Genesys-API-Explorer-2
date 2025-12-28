@@ -7,7 +7,9 @@ This is a working checklist for making Insight Packs more powerful and the resul
 - [ ] Add typed parameter definitions (`type`, `required`, `default`, `description`) across existing packs and UI parameter capture.
 - [ ] Validate packs against `insights/schema/insightpack.schema.json` (optional strict mode).
 - [ ] Add a `dryRun` mode: resolve templates + show planned requests without calling APIs.
+- [x] Add a `dryRun` mode: resolve templates + show planned requests without calling APIs.
 - [x] Add baseline comparison runner (previous window) for packs that accept `startDate`/`endDate`.
+- [x] Add a pack catalog UI + dynamic parameter rendering in Ops Console.
 
 ## Pipeline engine features
 
@@ -28,6 +30,7 @@ This is a working checklist for making Insight Packs more powerful and the resul
 - [ ] Pack catalog/index (tags, owner, scopes/permissions, expected runtime, maturity, examples).
 - [ ] Pack testing harness (`Invoke-GCInsightPackTest`) with fixtures + snapshot assertions for computed metrics.
 - [x] Append export entries to a briefings `index.json` for lightweight run history.
+- [x] Load and browse briefing history from `index.json` in the Ops Console.
 
 ## Packs added (initial set)
 

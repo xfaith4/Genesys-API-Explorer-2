@@ -7,7 +7,10 @@ function Invoke-GCInsightPack {
         [string]$PackPath,
 
         [Parameter()]
-        [hashtable]$Parameters
+        [hashtable]$Parameters,
+
+        [Parameter()]
+        [switch]$DryRun
     )
 
     $resolvedPackPath = Resolve-GCInsightPackPath -PackPath $PackPath
@@ -71,9 +74,22 @@ function Invoke-GCInsightPack {
                         $requestSplat.Body = $body
                     }
 
-                    $response = Invoke-GCRequest @requestSplat
-                    $ctx.Data[$step.id] = $response
-                    $log.ResultSummary = "HTTP $method → $pathWithQuery (received status: $($response.statusCode -or 'OK'))"
+                    if ($DryRun) {
+                        $planned = [pscustomobject]@{
+                            Method  = $method
+                            Path    = if ($requestSplat.ContainsKey('Path')) { $requestSplat.Path } else { $null }
+                            Uri     = if ($requestSplat.ContainsKey('Uri')) { $requestSplat.Uri } else { $null }
+                            Headers = $headers
+                            Body    = $body
+                        }
+                        $ctx.Data[$step.id] = $planned
+                        $log.ResultSummary = "DRY RUN: HTTP $method → $pathWithQuery"
+                    }
+                    else {
+                        $response = Invoke-GCRequest @requestSplat
+                        $ctx.Data[$step.id] = $response
+                        $log.ResultSummary = "HTTP $method → $pathWithQuery (received status: $($response.statusCode -or 'OK'))"
+                    }
                 }
 
                 'compute' {
@@ -81,7 +97,7 @@ function Invoke-GCInsightPack {
                     $scriptBlock = [scriptblock]::Create($step.script)
                     $result = & $scriptBlock $ctx
                     $ctx.Data[$step.id] = $result
-                    $log.ResultSummary = "Computed '$($step.id)'"
+                    $log.ResultSummary = if ($DryRun) { "DRY RUN: Computed '$($step.id)'" } else { "Computed '$($step.id)'" }
                 }
 
                 'metric' {
@@ -91,7 +107,7 @@ function Invoke-GCInsightPack {
                     if ($metric) {
                         $ctx.Metrics.Add($metric) | Out-Null
                         $title = if ($metric.PSObject.Properties.Name -contains 'title') { $metric.title } else { $step.id }
-                        $log.ResultSummary = "Metric '$title'"
+                        $log.ResultSummary = if ($DryRun) { "DRY RUN: Metric '$title'" } else { "Metric '$title'" }
                     }
                 }
 
@@ -101,7 +117,7 @@ function Invoke-GCInsightPack {
                     $drilldown = & $scriptBlock $ctx
                     if ($drilldown) {
                         $ctx.Drilldowns.Add($drilldown) | Out-Null
-                        $log.ResultSummary = "Drilldown '$($step.id)'"
+                        $log.ResultSummary = if ($DryRun) { "DRY RUN: Drilldown '$($step.id)'" } else { "Drilldown '$($step.id)'" }
                     }
                 }
 

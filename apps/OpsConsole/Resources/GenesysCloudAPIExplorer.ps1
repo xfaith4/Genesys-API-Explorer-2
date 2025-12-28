@@ -35,6 +35,185 @@ function Open-Url {
     }
 }
 
+function Launch-Url {
+    param ([string]$Url)
+    Open-Url -Url $Url
+}
+
+function Get-InsightPackCatalog {
+    param(
+        [Parameter(Mandatory)]
+        [string]$PackDirectory,
+
+        [Parameter()]
+        [string]$LegacyPackDirectory
+    )
+
+    $dirs = New-Object System.Collections.Generic.List[string]
+    if ($PackDirectory -and (Test-Path -LiteralPath $PackDirectory)) { $dirs.Add($PackDirectory) | Out-Null }
+    if ($LegacyPackDirectory -and (Test-Path -LiteralPath $LegacyPackDirectory) -and (-not ($LegacyPackDirectory -eq $PackDirectory))) {
+        $dirs.Add($LegacyPackDirectory) | Out-Null
+    }
+
+    $items = New-Object System.Collections.Generic.List[object]
+    foreach ($dir in $dirs) {
+        Get-ChildItem -Path $dir -Filter '*.json' -File -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object {
+            try {
+                $raw = Get-Content -LiteralPath $_.FullName -Raw
+                $pack = $raw | ConvertFrom-Json
+                if (-not $pack -or -not $pack.id) { return }
+
+                $items.Add([pscustomobject]@{
+                    Id          = [string]$pack.id
+                    Name        = [string]($pack.name ?? $pack.id)
+                    Version     = [string]($pack.version ?? '')
+                    Description = [string]($pack.description ?? '')
+                    Tags        = @($pack.tags)
+                    FileName    = $_.Name
+                    FullPath    = $_.FullName
+                    Pack        = $pack
+                    Display     = if ($pack.name) { "$($pack.name)  [$($pack.id)]" } else { [string]$pack.id }
+                }) | Out-Null
+            }
+            catch {
+                # ignore malformed packs; they should still be runnable by path if needed
+            }
+        }
+    }
+
+    return @($items | Sort-Object Name, Id)
+}
+
+function New-InsightPackParameterRow {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name,
+
+        [Parameter()]
+        [string]$Type,
+
+        [Parameter()]
+        [bool]$Required = $false,
+
+        [Parameter()]
+        $DefaultValue,
+
+        [Parameter()]
+        [string]$Description
+    )
+
+    $grid = New-Object System.Windows.Controls.Grid
+    $grid.Margin = '0,2,0,2'
+    [void]$grid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{ Width = '220' }))
+    [void]$grid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{ Width = '*' }))
+
+    $label = New-Object System.Windows.Controls.TextBlock
+    $label.Text = if ($Required) { "$Name *" } else { $Name }
+    $label.FontWeight = 'SemiBold'
+    $label.VerticalAlignment = 'Center'
+    if ($Description) { $label.ToolTip = $Description }
+    [System.Windows.Controls.Grid]::SetColumn($label, 0)
+    [void]$grid.Children.Add($label)
+
+    $control = $null
+    $normalizedType = if ($Type) { $Type.ToLowerInvariant() } else { '' }
+    if ($normalizedType -in @('bool', 'boolean')) {
+        $cb = New-Object System.Windows.Controls.CheckBox
+        $cb.VerticalAlignment = 'Center'
+        $cb.IsChecked = if ($null -ne $DefaultValue) { [bool]$DefaultValue } else { $false }
+        if ($Description) { $cb.ToolTip = $Description }
+        $control = $cb
+    }
+    else {
+        $tb = New-Object System.Windows.Controls.TextBox
+        $tb.MinWidth = 220
+        $tb.Height = 26
+        $tb.VerticalContentAlignment = 'Center'
+        $tb.Text = if ($null -ne $DefaultValue) { [string]$DefaultValue } else { '' }
+        if ($Description) { $tb.ToolTip = $Description }
+        $control = $tb
+    }
+
+    [System.Windows.Controls.Grid]::SetColumn($control, 1)
+    [void]$grid.Children.Add($control)
+
+    return [pscustomobject]@{
+        Name    = $Name
+        Control = $control
+        Row     = $grid
+    }
+}
+
+function Render-InsightPackParameters {
+    param(
+        [Parameter(Mandatory)]
+        $Pack,
+
+        [Parameter(Mandatory)]
+        [System.Windows.Controls.Panel]$Panel
+    )
+
+    $Panel.Children.Clear()
+    $script:InsightParamInputs = @{}
+
+    if (-not $Pack -or -not $Pack.parameters) {
+        $hint = New-Object System.Windows.Controls.TextBlock
+        $hint.Text = '(No parameters)'
+        $hint.Foreground = 'Gray'
+        [void]$Panel.Children.Add($hint)
+        return
+    }
+
+    foreach ($prop in ($Pack.parameters.PSObject.Properties | Sort-Object Name)) {
+        $paramName = $prop.Name
+        $definition = $prop.Value
+
+        $type = $null
+        $required = $false
+        $default = $null
+        $desc = $null
+
+        if ($definition -is [psobject]) {
+            $names = @($definition.PSObject.Properties.Name)
+            $isSchema = ($names -contains 'type') -or ($names -contains 'required') -or ($names -contains 'default') -or ($names -contains 'description')
+            if ($isSchema) {
+                $type = [string]$definition.type
+                if ($names -contains 'required') { $required = [bool]$definition.required }
+                if ($names -contains 'default') { $default = $definition.default }
+                if ($names -contains 'description') { $desc = [string]$definition.description }
+            }
+            else {
+                $default = $definition
+            }
+        }
+        else {
+            $default = $definition
+        }
+
+        $row = New-InsightPackParameterRow -Name $paramName -Type $type -Required:$required -DefaultValue $default -Description $desc
+        $script:InsightParamInputs[$paramName] = $row.Control
+        [void]$Panel.Children.Add($row.Row)
+    }
+}
+
+function Get-InsightPackParameterValues {
+    $values = @{}
+    foreach ($name in $script:InsightParamInputs.Keys) {
+        $control = $script:InsightParamInputs[$name]
+        if ($control -is [System.Windows.Controls.CheckBox]) {
+            $values[$name] = [bool]$control.IsChecked
+            continue
+        }
+        if ($control -is [System.Windows.Controls.TextBox]) {
+            $text = $control.Text
+            if (-not [string]::IsNullOrWhiteSpace($text)) {
+                $values[$name] = $text.Trim()
+            }
+        }
+    }
+    return $values
+}
+
 function Show-HelpWindow {
     $helpXaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -4786,17 +4965,65 @@ $Xaml = @"
           <RowDefinition Height="*"/>
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-	          <StackPanel Margin="0 0 0 8">
-	            <StackPanel Orientation="Horizontal" Margin="0 0 0 6">
-	              <Button Name="RunQueueSmokePackButton" Width="200" Height="34" Content="Queue Smoke Detector" Margin="0 0 10 0"/>
-	              <Button Name="RunDataActionsPackButton" Width="200" Height="34" Content="Data Action Failures" Margin="0 0 10 0"/>
-	              <Button Name="RunDataActionsEnrichedPackButton" Width="220" Height="34" Content="Data Actions (Enriched)" Margin="0 0 10 0"/>
-	            </StackPanel>
-	            <StackPanel Orientation="Horizontal">
-	              <Button Name="RunPeakConcurrencyPackButton" Width="220" Height="34" Content="Peak Concurrency (Voice)" Margin="0 0 10 0"/>
-	              <Button Name="ExportInsightBriefingButton" Width="170" Height="34" Content="Export Briefing" IsEnabled="False"/>
-	            </StackPanel>
-	          </StackPanel>
+          <StackPanel Grid.Row="0" Margin="0 0 0 8">
+            <GroupBox Header="Pack Runner" Margin="0 0 0 8">
+              <Grid Margin="10">
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="2*"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="Pack:" VerticalAlignment="Center" FontWeight="Bold" Margin="0 0 8 0"/>
+                  <ComboBox Name="InsightPackCombo" MinWidth="420" IsEditable="True" IsTextSearchEnabled="True"
+                            ToolTip="Select an Insight Pack from insights/packs"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                  <Button Name="RunSelectedInsightPackButton" Width="120" Height="30" Content="Run"/>
+                  <Button Name="CompareSelectedInsightPackButton" Width="140" Height="30" Content="Compare (Prev)" Margin="10 0 0 0"/>
+                  <Button Name="DryRunSelectedInsightPackButton" Width="110" Height="30" Content="Dry Run" Margin="10 0 0 0"/>
+                  <Button Name="ExportInsightBriefingButton" Width="130" Height="30" Content="Export Briefing" Margin="10 0 0 0" IsEnabled="False"/>
+                </StackPanel>
+
+                <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0 8 0 8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0" Name="InsightPackDescriptionText"
+                             Text="Select a pack to view parameters." TextWrapping="Wrap" Foreground="Gray"/>
+                  <TextBlock Grid.Column="1" Text="Start (UTC)" VerticalAlignment="Center" Margin="12 0 8 0" Foreground="SlateGray"/>
+                  <TextBox Grid.Column="2" Name="InsightGlobalStartInput" Width="220" Height="26" VerticalContentAlignment="Center"
+                           ToolTip="Default startDate for packs that define startDate (ISO-8601 UTC)"/>
+                  <TextBlock Grid.Column="3" Text="End (UTC)" VerticalAlignment="Center" Margin="12 0 8 0" Foreground="SlateGray"/>
+                  <TextBox Grid.Column="4" Name="InsightGlobalEndInput" Width="220" Height="26" VerticalContentAlignment="Center"
+                           ToolTip="Default endDate for packs that define endDate (ISO-8601 UTC)"/>
+                </Grid>
+
+                <ScrollViewer Grid.Row="2" Grid.ColumnSpan="2" VerticalScrollBarVisibility="Auto" MaxHeight="240">
+                  <StackPanel Name="InsightPackParametersPanel"/>
+                </ScrollViewer>
+              </Grid>
+            </GroupBox>
+
+            <Expander Header="Quick Packs" IsExpanded="False">
+              <StackPanel Orientation="Horizontal" Margin="10 6 0 0">
+                <Button Name="RunQueueSmokePackButton" Width="200" Height="30" Content="Queue Smoke Detector" Margin="0 0 10 0"/>
+                <Button Name="RunDataActionsPackButton" Width="200" Height="30" Content="Data Action Failures" Margin="0 0 10 0"/>
+                <Button Name="RunDataActionsEnrichedPackButton" Width="220" Height="30" Content="Data Actions (Enriched)" Margin="0 0 10 0"/>
+                <Button Name="RunPeakConcurrencyPackButton" Width="220" Height="30" Content="Peak Concurrency (Voice)"/>
+              </StackPanel>
+            </Expander>
+          </StackPanel>
           <StackPanel Grid.Row="1" Margin="0 0 0 8">
             <TextBlock Name="InsightEvidenceSummary" Text="Run an insight pack to surface the evidence narrative." TextWrapping="Wrap" Foreground="DarkSlateGray"/>
             <TextBlock Name="InsightBriefingPathText" Text="Briefings folder will appear here after the first export." TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0 4 0 0"/>
@@ -4829,17 +5056,29 @@ $Xaml = @"
               </ListView>
             </GroupBox>
         </Grid>
-        <GroupBox Header="Briefing History" Grid.Row="3" Margin="0 10 0 0" Height="150">
-          <ListView Name="InsightBriefingsList" Height="120">
-            <ListView.View>
-              <GridView>
-                <GridViewColumn Header="Time" DisplayMemberBinding="{Binding Timestamp}" Width="160"/>
-                <GridViewColumn Header="Pack" DisplayMemberBinding="{Binding Pack}" Width="180"/>
-                <GridViewColumn Header="Snapshot" DisplayMemberBinding="{Binding Snapshot}" Width="200"/>
-                <GridViewColumn Header="HTML" DisplayMemberBinding="{Binding Html}" Width="200"/>
-              </GridView>
-            </ListView.View>
-          </ListView>
+        <GroupBox Header="Briefing History" Grid.Row="3" Margin="0 10 0 0">
+          <Grid Margin="10">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0 0 0 8">
+              <Button Name="RefreshInsightBriefingsButton" Width="90" Height="28" Content="Refresh"/>
+              <Button Name="OpenBriefingsFolderButton" Width="110" Height="28" Content="Open Folder" Margin="10 0 0 0"/>
+              <Button Name="OpenBriefingHtmlButton" Width="110" Height="28" Content="Open HTML" Margin="10 0 0 0" IsEnabled="False"/>
+              <Button Name="OpenBriefingSnapshotButton" Width="140" Height="28" Content="Open Snapshot" Margin="10 0 0 0" IsEnabled="False"/>
+            </StackPanel>
+            <ListView Grid.Row="1" Name="InsightBriefingsList">
+              <ListView.View>
+                <GridView>
+                  <GridViewColumn Header="Time (UTC)" DisplayMemberBinding="{Binding Timestamp}" Width="160"/>
+                  <GridViewColumn Header="Pack" DisplayMemberBinding="{Binding Pack}" Width="220"/>
+                  <GridViewColumn Header="Snapshot" DisplayMemberBinding="{Binding Snapshot}" Width="220"/>
+                  <GridViewColumn Header="HTML" DisplayMemberBinding="{Binding Html}" Width="220"/>
+                </GridView>
+              </ListView.View>
+            </ListView>
+          </Grid>
         </GroupBox>
       </Grid>
       </TabItem>
@@ -4976,16 +5215,28 @@ $resetEndpointsMenuItem = $Window.FindName("ResetEndpointsMenuItem")
 $requestHistoryList = $Window.FindName("RequestHistoryList")
 $replayRequestButton = $Window.FindName("ReplayRequestButton")
 $clearHistoryButton = $Window.FindName("ClearHistoryButton")
-$runQueueSmokePackButton = $Window.FindName("RunQueueSmokePackButton")
-$runDataActionsPackButton = $Window.FindName("RunDataActionsPackButton")
-$runDataActionsEnrichedPackButton = $Window.FindName("RunDataActionsEnrichedPackButton")
-$runPeakConcurrencyPackButton = $Window.FindName("RunPeakConcurrencyPackButton")
-$exportInsightBriefingButton = $Window.FindName("ExportInsightBriefingButton")
-$insightEvidenceSummary = $Window.FindName("InsightEvidenceSummary")
+ $runQueueSmokePackButton = $Window.FindName("RunQueueSmokePackButton")
+ $runDataActionsPackButton = $Window.FindName("RunDataActionsPackButton")
+ $runDataActionsEnrichedPackButton = $Window.FindName("RunDataActionsEnrichedPackButton")
+ $runPeakConcurrencyPackButton = $Window.FindName("RunPeakConcurrencyPackButton")
+ $runSelectedInsightPackButton = $Window.FindName("RunSelectedInsightPackButton")
+ $compareSelectedInsightPackButton = $Window.FindName("CompareSelectedInsightPackButton")
+ $dryRunSelectedInsightPackButton = $Window.FindName("DryRunSelectedInsightPackButton")
+ $insightPackCombo = $Window.FindName("InsightPackCombo")
+ $insightPackDescriptionText = $Window.FindName("InsightPackDescriptionText")
+ $insightPackParametersPanel = $Window.FindName("InsightPackParametersPanel")
+ $insightGlobalStartInput = $Window.FindName("InsightGlobalStartInput")
+ $insightGlobalEndInput = $Window.FindName("InsightGlobalEndInput")
+ $exportInsightBriefingButton = $Window.FindName("ExportInsightBriefingButton")
+ $insightEvidenceSummary = $Window.FindName("InsightEvidenceSummary")
 $insightMetricsList = $Window.FindName("InsightMetricsList")
 $insightDrilldownsList = $Window.FindName("InsightDrilldownsList")
 $insightBriefingPathText = $Window.FindName("InsightBriefingPathText")
 $insightBriefingsList = $Window.FindName("InsightBriefingsList")
+$refreshInsightBriefingsButton = $Window.FindName("RefreshInsightBriefingsButton")
+$openBriefingsFolderButton = $Window.FindName("OpenBriefingsFolderButton")
+$openBriefingHtmlButton = $Window.FindName("OpenBriefingHtmlButton")
+$openBriefingSnapshotButton = $Window.FindName("OpenBriefingSnapshotButton")
 $exportPowerShellButton = $Window.FindName("ExportPowerShellButton")
 $exportCurlButton = $Window.FindName("ExportCurlButton")
 $templatesList = $Window.FindName("TemplatesList")
@@ -5332,14 +5583,12 @@ function Export-InsightBriefingWorkflow {
         $insightBriefingPathText.Text = "Briefings folder: $outputDir`nLast export: $($exportResult.HtmlPath)"
     }
 
-    $packLabel = if ($script:LastInsightResult.Pack.name) { $script:LastInsightResult.Pack.name } else { $script:LastInsightResult.Pack.id }
-    $historyEntry = [pscustomobject]@{
-        Timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-        Pack      = $packLabel
-        Snapshot  = (Split-Path -Leaf $exportResult.SnapshotPath)
-        Html      = (Split-Path -Leaf $exportResult.HtmlPath)
+    Refresh-InsightBriefingHistory
+
+    if ($insightBriefingsList -and $script:InsightBriefingsHistory.Count -gt 0) {
+        $insightBriefingsList.SelectedIndex = $script:InsightBriefingsHistory.Count - 1
+        $insightBriefingsList.ScrollIntoView($insightBriefingsList.SelectedItem)
     }
-    $script:InsightBriefingsHistory.Add($historyEntry) | Out-Null
 
     [System.Windows.MessageBox]::Show("Briefing exported to:`n$($exportResult.HtmlPath)", "Insight Briefing", "OK", "Information")
 }
@@ -6397,6 +6646,210 @@ if ($insightBriefingsList) {
 }
 if ($insightBriefingPathText -and $insightBriefingRoot) {
     $insightBriefingPathText.Text = "Briefings folder: $insightBriefingRoot"
+}
+
+function Refresh-InsightBriefingHistory {
+    $outputDir = Get-InsightBriefingDirectory
+    $indexPath = Join-Path -Path $outputDir -ChildPath 'index.json'
+
+    $script:InsightBriefingsHistory.Clear()
+
+    if (-not (Test-Path -LiteralPath $indexPath)) { return }
+
+    try {
+        $raw = Get-Content -LiteralPath $indexPath -Raw
+        if ([string]::IsNullOrWhiteSpace($raw)) { return }
+
+        $entries = @($raw | ConvertFrom-Json)
+        foreach ($entry in $entries) {
+            $timestamp = if ($entry.TimestampUtc) { [string]$entry.TimestampUtc } else { '' }
+            $packLabel = if ($entry.PackName) { "$($entry.PackName)" } elseif ($entry.PackId) { "$($entry.PackId)" } else { '' }
+
+            $snapshotLeaf = [string]$entry.Snapshot
+            $htmlLeaf = [string]$entry.Html
+
+            $historyEntry = [pscustomobject]@{
+                Timestamp       = $timestamp
+                Pack            = $packLabel
+                Snapshot        = $snapshotLeaf
+                Html            = $htmlLeaf
+                SnapshotPath    = if ($snapshotLeaf) { Join-Path -Path $outputDir -ChildPath $snapshotLeaf } else { $null }
+                HtmlPath        = if ($htmlLeaf) { Join-Path -Path $outputDir -ChildPath $htmlLeaf } else { $null }
+            }
+            $script:InsightBriefingsHistory.Add($historyEntry) | Out-Null
+        }
+    }
+    catch {
+        Add-LogEntry "Failed to load insight briefing index: $($_.Exception.Message)"
+    }
+}
+
+if ($refreshInsightBriefingsButton) {
+    $refreshInsightBriefingsButton.Add_Click({
+            Refresh-InsightBriefingHistory
+        })
+}
+
+if ($openBriefingsFolderButton) {
+    $openBriefingsFolderButton.Add_Click({
+            try {
+                $dir = Get-InsightBriefingDirectory
+                if ($dir) { Start-Process -FilePath $dir }
+            } catch {}
+        })
+}
+
+if ($insightBriefingsList) {
+    $insightBriefingsList.Add_SelectionChanged({
+            $selected = $insightBriefingsList.SelectedItem
+            $has = ($null -ne $selected)
+            if ($openBriefingHtmlButton) { $openBriefingHtmlButton.IsEnabled = $has -and $selected.HtmlPath }
+            if ($openBriefingSnapshotButton) { $openBriefingSnapshotButton.IsEnabled = $has -and $selected.SnapshotPath }
+        })
+}
+
+if ($openBriefingHtmlButton) {
+    $openBriefingHtmlButton.Add_Click({
+            $selected = if ($insightBriefingsList) { $insightBriefingsList.SelectedItem } else { $null }
+            if ($selected -and $selected.HtmlPath -and (Test-Path -LiteralPath $selected.HtmlPath)) {
+                Start-Process -FilePath $selected.HtmlPath
+            }
+        })
+}
+
+if ($openBriefingSnapshotButton) {
+    $openBriefingSnapshotButton.Add_Click({
+            $selected = if ($insightBriefingsList) { $insightBriefingsList.SelectedItem } else { $null }
+            if ($selected -and $selected.SnapshotPath -and (Test-Path -LiteralPath $selected.SnapshotPath)) {
+                Start-Process -FilePath $selected.SnapshotPath
+            }
+        })
+}
+
+Refresh-InsightBriefingHistory
+
+if (-not $script:InsightParamInputs) { $script:InsightParamInputs = @{} }
+$script:InsightPackCatalog = @()
+
+if ($insightPackCombo) {
+    $script:InsightPackCatalog = @(Get-InsightPackCatalog -PackDirectory $insightPackRoot -LegacyPackDirectory $legacyInsightPackRoot)
+    $insightPackCombo.ItemsSource = $script:InsightPackCatalog
+    $insightPackCombo.DisplayMemberPath = 'Display'
+
+    $insightPackCombo.Add_SelectionChanged({
+            $selected = $insightPackCombo.SelectedItem
+            if (-not $selected) { return }
+
+            if ($insightPackDescriptionText) {
+                $insightPackDescriptionText.Text = if ($selected.Description) { $selected.Description } else { $selected.Id }
+            }
+            if ($insightPackParametersPanel) {
+                Render-InsightPackParameters -Pack $selected.Pack -Panel $insightPackParametersPanel
+            }
+
+            # Apply global defaults (only if the pack defines these params and the controls are empty)
+            if ($script:InsightParamInputs.ContainsKey('startDate') -and $insightGlobalStartInput -and -not [string]::IsNullOrWhiteSpace($insightGlobalStartInput.Text)) {
+                $ctrl = $script:InsightParamInputs['startDate']
+                if ($ctrl -is [System.Windows.Controls.TextBox] -and [string]::IsNullOrWhiteSpace($ctrl.Text)) {
+                    $ctrl.Text = $insightGlobalStartInput.Text.Trim()
+                }
+            }
+            if ($script:InsightParamInputs.ContainsKey('endDate') -and $insightGlobalEndInput -and -not [string]::IsNullOrWhiteSpace($insightGlobalEndInput.Text)) {
+                $ctrl = $script:InsightParamInputs['endDate']
+                if ($ctrl -is [System.Windows.Controls.TextBox] -and [string]::IsNullOrWhiteSpace($ctrl.Text)) {
+                    $ctrl.Text = $insightGlobalEndInput.Text.Trim()
+                }
+            }
+        })
+
+    if ($script:InsightPackCatalog.Count -gt 0) {
+        $insightPackCombo.SelectedIndex = 0
+    }
+}
+
+function Run-SelectedInsightPack {
+    param(
+        [Parameter(Mandatory)]
+        [bool]$Compare,
+
+        [Parameter()]
+        [bool]$DryRun = $false
+    )
+
+    if (-not $insightPackCombo -or -not $insightPackCombo.SelectedItem) {
+        throw "Select an Insight Pack first."
+    }
+
+    $selected = $insightPackCombo.SelectedItem
+    $packPath = $selected.FullPath
+    if (-not (Test-Path -LiteralPath $packPath)) {
+        $packPath = Get-InsightPackPath -FileName $selected.FileName
+    }
+
+    Ensure-OpsInsightsModuleLoaded
+    $packParams = Get-InsightPackParameterValues
+
+    if ($Compare) {
+        $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams
+    }
+    else {
+        if ($DryRun) {
+            $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -DryRun
+        }
+        else {
+            $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams
+        }
+    }
+
+    $script:LastInsightResult = $result
+    Update-InsightPackUi -Result $result
+    if ($exportInsightBriefingButton) { $exportInsightBriefingButton.IsEnabled = $true }
+    return $result
+}
+
+if ($runSelectedInsightPackButton) {
+    $runSelectedInsightPackButton.Add_Click({
+            try {
+                $statusText.Text = "Running insight pack..."
+                Run-SelectedInsightPack -Compare:$false -DryRun:$false | Out-Null
+                $statusText.Text = "Insight pack completed."
+            }
+            catch {
+                $statusText.Text = "Insight pack failed."
+                Add-LogEntry "Insight pack failed: $($_.Exception.Message)"
+                [System.Windows.MessageBox]::Show("Insight pack failed: $($_.Exception.Message)", "Insight Pack Error", "OK", "Error")
+            }
+        })
+}
+
+if ($compareSelectedInsightPackButton) {
+    $compareSelectedInsightPackButton.Add_Click({
+            try {
+                $statusText.Text = "Running insight pack (compare)..."
+                Run-SelectedInsightPack -Compare:$true -DryRun:$false | Out-Null
+                $statusText.Text = "Insight pack comparison completed."
+            }
+            catch {
+                $statusText.Text = "Insight pack comparison failed."
+                Add-LogEntry "Insight pack compare failed: $($_.Exception.Message)"
+                [System.Windows.MessageBox]::Show("Insight pack compare failed: $($_.Exception.Message)", "Insight Pack Error", "OK", "Error")
+            }
+        })
+}
+
+if ($dryRunSelectedInsightPackButton) {
+    $dryRunSelectedInsightPackButton.Add_Click({
+            try {
+                $statusText.Text = "Running insight pack (dry run)..."
+                Run-SelectedInsightPack -Compare:$false -DryRun:$true | Out-Null
+                $statusText.Text = "Insight pack dry run completed."
+            }
+            catch {
+                $statusText.Text = "Insight pack dry run failed."
+                Add-LogEntry "Insight pack dry run failed: $($_.Exception.Message)"
+                [System.Windows.MessageBox]::Show("Insight pack dry run failed: $($_.Exception.Message)", "Insight Pack Error", "OK", "Error")
+            }
+        })
 }
 
 if ($runQueueSmokePackButton) {

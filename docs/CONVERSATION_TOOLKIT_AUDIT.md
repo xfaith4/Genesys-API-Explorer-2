@@ -59,7 +59,7 @@ The toolkit correctly aggregates conversation data from 6 different Genesys Clou
 
 **Data Flow:**
 ```
-API Endpoints → Invoke-GCRequest → Get-GCConversationTimeline → Add-TimelineEvent
+API Endpoints → Invoke-GCRequest → Get-GCConversationTimeline → (normalize timeline events)
                                                                         ↓
                                                             Chronologically Sorted
                                                                         ↓
