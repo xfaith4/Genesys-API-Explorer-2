@@ -1,0 +1,46 @@
+{
+  "id": "gc.calls.peakConcurrency.monthly.v1",
+  "name": "Peak Concurrent Voice Calls (Monthly)",
+  "version": "1.0.0",
+  "description": "Computes peak concurrent voice sessions over a time window using Analytics Conversation Detail Jobs (1-minute buckets).",
+  "tags": ["calls", "voice", "capacity", "analytics"],
+  "parameters": {
+    "startDate": {
+      "type": "string",
+      "required": true,
+      "description": "ISO-8601 UTC start timestamp (e.g. 2025-11-01T00:00:00Z)."
+    },
+    "endDate": {
+      "type": "string",
+      "required": true,
+      "description": "ISO-8601 UTC end timestamp (e.g. 2025-12-01T00:00:00Z)."
+    },
+    "chunkDays": {
+      "type": "int",
+      "default": 1,
+      "description": "Split the window into N-day chunks to reduce job size."
+    },
+    "excludeWrapup": {
+      "type": "bool",
+      "default": true,
+      "description": "If true, end session intervals at wrapup.segmentStart when present."
+    }
+  },
+  "pipeline": [
+    {
+      "id": "peak",
+      "type": "compute",
+      "script": "param($ctx)\n\nfunction Parse-GcUtc([string]$Value) {\n  return [datetime]::Parse(\n    $Value,\n    [System.Globalization.CultureInfo]::InvariantCulture,\n    [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal\n  )\n}\n\nfunction Floor-ToMinuteUtc([datetime]$Utc) {\n  return [datetime]::SpecifyKind((New-Object datetime($Utc.Year, $Utc.Month, $Utc.Day, $Utc.Hour, $Utc.Minute, 0)), [System.DateTimeKind]::Utc)\n}\n\nfunction Ceil-ToMinuteUtc([datetime]$Utc) {\n  $flo = Floor-ToMinuteUtc -Utc $Utc\n  if ($Utc -gt $flo) { return $flo.AddMinutes(1) }\n  return $flo\n}\n\n$startUtc = Parse-GcUtc -Value ([string]$ctx.Parameters.startDate)\n$endUtc = Parse-GcUtc -Value ([string]$ctx.Parameters.endDate)\nif ($endUtc -le $startUtc) { throw \"endDate must be after startDate.\" }\n\n$chunkDays = [math]::Max(1, [int]$ctx.Parameters.chunkDays)\n$chunkSpan = [timespan]::FromDays($chunkDays)\n$totalMinutes = [int][math]::Ceiling(($endUtc - $startUtc).TotalMinutes)\nif ($totalMinutes -le 0) { throw \"Window is too small to analyze.\" }\n\n$diff = New-Object 'int[]' ($totalMinutes + 1)\n\n$cursorRowLimit = 500\n$excludeWrapup = [bool]$ctx.Parameters.excludeWrapup\n\n$chunkStart = $startUtc\nwhile ($chunkStart -lt $endUtc) {\n  $chunkEnd = $chunkStart.Add($chunkSpan)\n  if ($chunkEnd -gt $endUtc) { $chunkEnd = $endUtc }\n\n  $intervalStr = \"$($chunkStart.ToString('o'))/$($chunkEnd.ToString('o'))\"\n  $jobBody = @{\n    interval = $intervalStr\n    order = 'asc'\n    orderBy = 'conversationStart'\n    segmentFilters = @(\n      @{ type = 'and'; predicates = @( @{ type='dimension'; dimension='mediaType'; value='voice' } ) }\n    )\n  }\n\n  $job = Invoke-GCRequest -Method POST -Path '/api/v2/analytics/conversations/details/jobs' -Body $jobBody\n  $jobId = $job.id\n  if ([string]::IsNullOrWhiteSpace($jobId)) { throw \"Job id not returned for interval $intervalStr\" }\n\n  while ($true) {\n    Start-Sleep -Seconds 2\n    $jobStatus = Invoke-GCRequest -Method GET -Path (\"/api/v2/analytics/conversations/details/jobs/{0}\" -f $jobId)\n    $state = $jobStatus.state\n    if ([string]::IsNullOrWhiteSpace($state)) { $state = $jobStatus.status }\n    if ($state -match 'FULFILLED|COMPLETED') { break }\n    if ($state -match 'FAILED|ERROR') { throw \"Job $jobId failed (state=$state)\" }\n  }\n\n  $cursor = $null\n  do {\n    $path = (\"/api/v2/analytics/conversations/details/jobs/{0}/results\" -f $jobId)\n    if ($cursor) {\n      $path = $path + \"?cursor=\" + [System.Uri]::EscapeDataString([string]$cursor)\n    }\n\n    $page = Invoke-GCRequest -Method GET -Path $path\n    $conversations = @($page.conversations)\n    $cursor = $page.cursor\n\n    foreach ($conv in $conversations) {\n      $convId = if ($conv.conversationId) { $conv.conversationId } else { $conv.id }\n      if (-not $convId) { continue }\n\n      foreach ($p in @($conv.participants)) {\n        foreach ($s in @($p.sessions)) {\n          if ($s.mediaType -ne 'voice') { continue }\n\n          $segmentsSorted = @($s.segments) | Where-Object { $_ -and $_.segmentStart } | Sort-Object segmentStart\n          $start = $null\n          $end = $null\n\n          if ($segmentsSorted.Count -gt 0) {\n            $start = Parse-GcUtc -Value $segmentsSorted[0].segmentStart\n\n            if ($excludeWrapup) {\n              $wrap = $segmentsSorted | Where-Object { $_.segmentType -eq 'wrapup' } | Select-Object -First 1\n              if ($wrap -and $wrap.segmentStart) {\n                $end = Parse-GcUtc -Value $wrap.segmentStart\n              }\n            }\n\n            if (-not $end) {\n              $maxEnd = $null\n              foreach ($seg in $segmentsSorted) {\n                if ($seg.segmentEnd) {\n                  $t = Parse-GcUtc -Value $seg.segmentEnd\n                  if (-not $maxEnd -or $t -gt $maxEnd) { $maxEnd = $t }\n                }\n              }\n              $end = $maxEnd\n            }\n          }\n\n          if (-not $start -and $conv.conversationStart) { $start = Parse-GcUtc -Value $conv.conversationStart }\n          if (-not $end -and $conv.conversationEnd) { $end = Parse-GcUtc -Value $conv.conversationEnd }\n\n          if (-not $start -or -not $end) { continue }\n          if ($end -le $start) { continue }\n\n          $startBucket = Floor-ToMinuteUtc -Utc $start\n          $endBucketEx = Ceil-ToMinuteUtc  -Utc $end\n\n          $startIndex = [int][math]::Floor(($startBucket - $startUtc).TotalMinutes)\n          $endIndexEx = [int][math]::Floor(($endBucketEx - $startUtc).TotalMinutes)\n\n          if ($startIndex -lt 0) { $startIndex = 0 }\n          if ($endIndexEx -gt $totalMinutes) { $endIndexEx = $totalMinutes }\n          if ($endIndexEx -le $startIndex) { continue }\n\n          $diff[$startIndex]++\n          $diff[$endIndexEx]--\n        }\n      }\n    }\n\n  } while ($cursor)\n\n  $chunkStart = $chunkEnd\n}\n\n$running = 0\n$peak = 0\n$peakMinuteUtc = $null\n$peaks = New-Object 'System.Collections.Generic.List[object]'\n\nfor ($i = 0; $i -lt $totalMinutes; $i++) {\n  $running += $diff[$i]\n  if ($running -gt $peak) {\n    $peak = $running\n    $peakMinuteUtc = $startUtc.AddMinutes($i)\n    $peaks.Clear()\n    $peaks.Add([pscustomobject]@{ minuteUtc = $peakMinuteUtc.ToString('o'); concurrent = $running }) | Out-Null\n  }\n  elseif ($running -eq $peak -and $peak -gt 0) {\n    $peaks.Add([pscustomobject]@{ minuteUtc = $startUtc.AddMinutes($i).ToString('o'); concurrent = $running }) | Out-Null\n  }\n\n  if ($peaks.Count -gt $cursorRowLimit) {\n    $peaks.RemoveAt(0)\n  }\n}\n\n[pscustomobject]@{\n  startDateUtc = $startUtc.ToString('o')\n  endDateUtc = $endUtc.ToString('o')\n  bucket = '1m'\n  peakConcurrent = $peak\n  firstPeakMinuteUtc = if ($peakMinuteUtc) { $peakMinuteUtc.ToString('o') } else { $null }\n  peakMinutesUtc = @($peaks)\n}\n"
+    },
+    {
+      "id": "metricPeak",
+      "type": "metric",
+      "script": "param($ctx)\n$result = $ctx.Data.peak\n[pscustomobject]@{ title='Peak Concurrent Voice Sessions'; value=$result.peakConcurrent; items=@($result.peakMinutesUtc) }\n"
+    },
+    {
+      "id": "drilldownPeaks",
+      "type": "drilldown",
+      "script": "param($ctx)\n$result = $ctx.Data.peak\n[pscustomobject]@{ title='Peak Minutes (UTC)'; items=@($result.peakMinutesUtc) }\n"
+    }
+  ]
+}

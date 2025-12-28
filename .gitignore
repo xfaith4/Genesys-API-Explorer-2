@@ -1,6 +1,8 @@
 # Insight briefing exports (runtime artifacts)
-InsightBriefings/
-insights/briefings/
+InsightBriefings/*
+!InsightBriefings/README.md
+insights/briefings/*
+!insights/briefings/README.md
 
 # Temporary exports / reports
 reports/

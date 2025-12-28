@@ -4778,19 +4778,55 @@ $Xaml = @"
           </StackPanel>
         </Grid>
       </TabItem>
-      <TabItem Header="Ops Insights">
-      <Grid Margin="10">
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto"/>
-          <RowDefinition Height="Auto"/>
-          <RowDefinition Height="*"/>
-          <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-          <StackPanel Orientation="Horizontal" Margin="0 0 0 8">
-            <Button Name="RunQueueSmokePackButton" Width="200" Height="34" Content="Queue Smoke Detector" Margin="0 0 10 0"/>
-            <Button Name="RunDataActionsPackButton" Width="200" Height="34" Content="Data Action Failures" Margin="0 0 10 0"/>
-            <Button Name="ExportInsightBriefingButton" Width="170" Height="34" Content="Export Briefing" IsEnabled="False"/>
-          </StackPanel>
+	      <TabItem Header="Ops Insights">
+	      <Grid Margin="10">
+	        <Grid.RowDefinitions>
+	          <RowDefinition Height="Auto"/>
+	          <RowDefinition Height="Auto"/>
+	          <RowDefinition Height="*"/>
+	          <RowDefinition Height="Auto"/>
+	        </Grid.RowDefinitions>
+	          <StackPanel Margin="0 0 0 8">
+	            <GroupBox Header="Run Parameters" Margin="0 0 0 8">
+	              <Grid Margin="10">
+	                <Grid.ColumnDefinitions>
+	                  <ColumnDefinition Width="Auto"/>
+	                  <ColumnDefinition Width="220"/>
+	                  <ColumnDefinition Width="Auto"/>
+	                  <ColumnDefinition Width="220"/>
+	                  <ColumnDefinition Width="Auto"/>
+	                  <ColumnDefinition Width="120"/>
+	                </Grid.ColumnDefinitions>
+	                <Grid.RowDefinitions>
+	                  <RowDefinition Height="Auto"/>
+	                  <RowDefinition Height="Auto"/>
+	                </Grid.RowDefinitions>
+
+	                <TextBlock Grid.Row="0" Grid.Column="0" Text="Start (UTC)" VerticalAlignment="Center" Margin="0 0 10 0"/>
+	                <TextBox Grid.Row="0" Grid.Column="1" Name="InsightStartDateInput" Height="26" VerticalContentAlignment="Center" ToolTip="ISO-8601 UTC timestamp (e.g. 2025-12-01T00:00:00Z)"/>
+
+	                <TextBlock Grid.Row="0" Grid.Column="2" Text="End (UTC)" VerticalAlignment="Center" Margin="12 0 10 0"/>
+	                <TextBox Grid.Row="0" Grid.Column="3" Name="InsightEndDateInput" Height="26" VerticalContentAlignment="Center" ToolTip="ISO-8601 UTC timestamp (e.g. 2025-12-08T00:00:00Z)"/>
+
+	                <TextBlock Grid.Row="0" Grid.Column="4" Text="Top N" VerticalAlignment="Center" Margin="12 0 10 0"/>
+	                <TextBox Grid.Row="0" Grid.Column="5" Name="InsightTopNInput" Height="26" VerticalContentAlignment="Center" ToolTip="Optional (e.g. 10)"/>
+
+	                <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Name="InsightCompareBaselineCheckbox" Content="Compare to previous period" Margin="0 10 0 0"/>
+	                <TextBlock Grid.Row="1" Grid.Column="3" Grid.ColumnSpan="3" Text="(Uses previous window of same length based on Start/End)" Margin="0 10 0 0" Foreground="Gray" FontSize="11"/>
+	              </Grid>
+	            </GroupBox>
+
+	            <StackPanel Orientation="Horizontal" Margin="0 0 0 6">
+	              <Button Name="RunQueueSmokePackButton" Width="200" Height="34" Content="Queue Smoke Detector" Margin="0 0 10 0"/>
+	              <Button Name="RunDataActionsPackButton" Width="200" Height="34" Content="Data Action Failures" Margin="0 0 10 0"/>
+	              <Button Name="RunDataActionsEnrichedPackButton" Width="220" Height="34" Content="Data Actions (Enriched)" Margin="0 0 10 0"/>
+	            </StackPanel>
+
+	            <StackPanel Orientation="Horizontal">
+	              <Button Name="RunPeakConcurrencyPackButton" Width="220" Height="34" Content="Peak Concurrency (Voice)" Margin="0 0 10 0"/>
+	              <Button Name="ExportInsightBriefingButton" Width="170" Height="34" Content="Export Briefing" IsEnabled="False"/>
+	            </StackPanel>
+	          </StackPanel>
           <StackPanel Grid.Row="1" Margin="0 0 0 8">
             <TextBlock Name="InsightEvidenceSummary" Text="Run an insight pack to surface the evidence narrative." TextWrapping="Wrap" Foreground="DarkSlateGray"/>
             <TextBlock Name="InsightBriefingPathText" Text="Briefings folder will appear here after the first export." TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0 4 0 0"/>
@@ -4972,8 +5008,14 @@ $replayRequestButton = $Window.FindName("ReplayRequestButton")
 $clearHistoryButton = $Window.FindName("ClearHistoryButton")
  $runQueueSmokePackButton = $Window.FindName("RunQueueSmokePackButton")
  $runDataActionsPackButton = $Window.FindName("RunDataActionsPackButton")
+ $runDataActionsEnrichedPackButton = $Window.FindName("RunDataActionsEnrichedPackButton")
+ $runPeakConcurrencyPackButton = $Window.FindName("RunPeakConcurrencyPackButton")
  $exportInsightBriefingButton = $Window.FindName("ExportInsightBriefingButton")
  $insightEvidenceSummary = $Window.FindName("InsightEvidenceSummary")
+ $insightStartDateInput = $Window.FindName("InsightStartDateInput")
+ $insightEndDateInput = $Window.FindName("InsightEndDateInput")
+ $insightTopNInput = $Window.FindName("InsightTopNInput")
+ $insightCompareBaselineCheckbox = $Window.FindName("InsightCompareBaselineCheckbox")
 $insightMetricsList = $Window.FindName("InsightMetricsList")
 $insightDrilldownsList = $Window.FindName("InsightDrilldownsList")
 $insightBriefingPathText = $Window.FindName("InsightBriefingPathText")
@@ -5284,11 +5326,38 @@ function Run-InsightPackWorkflow {
 
     if ($runQueueSmokePackButton) { $runQueueSmokePackButton.IsEnabled = $false }
     if ($runDataActionsPackButton) { $runDataActionsPackButton.IsEnabled = $false }
+    if ($runDataActionsEnrichedPackButton) { $runDataActionsEnrichedPackButton.IsEnabled = $false }
+    if ($runPeakConcurrencyPackButton) { $runPeakConcurrencyPackButton.IsEnabled = $false }
     $statusText.Text = "Running insight pack: $Label..."
 
     try {
         Ensure-OpsInsightsModuleLoaded
-        $result = Invoke-GCInsightPack -PackPath $packPath
+
+        $packParams = @{}
+        if ($insightStartDateInput -and -not [string]::IsNullOrWhiteSpace($insightStartDateInput.Text)) {
+            $packParams.startDate = $insightStartDateInput.Text.Trim()
+        }
+        if ($insightEndDateInput -and -not [string]::IsNullOrWhiteSpace($insightEndDateInput.Text)) {
+            $packParams.endDate = $insightEndDateInput.Text.Trim()
+        }
+        if ($insightTopNInput -and -not [string]::IsNullOrWhiteSpace($insightTopNInput.Text)) {
+            $rawTopN = $insightTopNInput.Text.Trim()
+            try { $packParams.topN = [int]$rawTopN } catch { $packParams.topN = $rawTopN }
+        }
+
+        $useCompare = $false
+        if ($insightCompareBaselineCheckbox) { $useCompare = [bool]$insightCompareBaselineCheckbox.IsChecked }
+
+        if ($useCompare -and (-not $packParams.ContainsKey('startDate') -or -not $packParams.ContainsKey('endDate'))) {
+            throw "Comparison requires Start (UTC) and End (UTC) parameters."
+        }
+
+        $result = if ($useCompare) {
+            Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams
+        }
+        else {
+            Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams
+        }
         $script:LastInsightResult = $result
         Update-InsightPackUi -Result $result
         if ($exportInsightBriefingButton) {
@@ -5305,6 +5374,8 @@ function Run-InsightPackWorkflow {
     finally {
         if ($runQueueSmokePackButton) { $runQueueSmokePackButton.IsEnabled = $true }
         if ($runDataActionsPackButton) { $runDataActionsPackButton.IsEnabled = $true }
+        if ($runDataActionsEnrichedPackButton) { $runDataActionsEnrichedPackButton.IsEnabled = $true }
+        if ($runPeakConcurrencyPackButton) { $runPeakConcurrencyPackButton.IsEnabled = $true }
     }
 }
 
@@ -6400,6 +6471,18 @@ if ($runQueueSmokePackButton) {
 if ($runDataActionsPackButton) {
     $runDataActionsPackButton.Add_Click({
             Run-InsightPackWorkflow -Label "Data Action Failures" -FileName "gc.dataActions.failures.v1.json"
+        })
+}
+
+if ($runDataActionsEnrichedPackButton) {
+    $runDataActionsEnrichedPackButton.Add_Click({
+            Run-InsightPackWorkflow -Label "Data Actions (Enriched)" -FileName "gc.dataActions.failures.enriched.v1.json"
+        })
+}
+
+if ($runPeakConcurrencyPackButton) {
+    $runPeakConcurrencyPackButton.Add_Click({
+            Run-InsightPackWorkflow -Label "Peak Concurrency (Voice)" -FileName "gc.calls.peakConcurrency.monthly.v1.json"
         })
 }
 

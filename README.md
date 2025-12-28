@@ -66,7 +66,12 @@ Export-GCConversationToExcel `
 
 ### Insight Packs & Evidence Briefings
 
-- The `insights/packs/` folder defines curated workflows such as `gc.queues.smoke.v1` and `gc.dataActions.failures.v1`. Run any pack with:
+- The `insights/packs/` folder defines curated workflows such as:
+  - `gc.queues.smoke.v1` (queue smoke detector)
+  - `gc.dataActions.failures.v1` / `gc.dataActions.failures.enriched.v1` (Data Actions failures + enrichment)
+  - `gc.calls.peakConcurrency.monthly.v1` (peak concurrent voice sessions)
+
+  Run any pack with:
 
   ```powershell
   $result = Invoke-GCInsightPack -PackPath .\insights\packs\gc.queues.smoke.v1.json -Parameters @{ startDate = '2025-12-01T00:00:00Z'; endDate = '2025-12-08T00:00:00Z' }
@@ -80,6 +85,8 @@ Export-GCConversationToExcel `
   - JSON snapshot (`.snapshot.json`)
   - HTML briefing (`.html`) via `Export-GCInsightPackHtml`
   - Excel/CSV table (`.xlsx`/`.csv`) via `Export-GCInsightPackExcel`
+
+- For week-over-week style deltas, run `Invoke-GCInsightPackCompare` (or check "Compare to previous period" in the Ops Console and provide Start/End UTC).
 
 ### Phase 1 Enhancements
 

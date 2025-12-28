@@ -35,6 +35,32 @@ function Export-GCInsightBriefing {
     $exportedHtml     = Export-GCInsightPackHtml -Result $Result -Path $htmlPath
     $excelInfo        = Export-GCInsightPackExcel -Result $Result -Path $excelPath -Force:$Force
 
+    try {
+        $indexPath = Join-Path -Path $Directory -ChildPath 'index.json'
+        $existing = @()
+        if (Test-Path -LiteralPath $indexPath) {
+            $raw = Get-Content -LiteralPath $indexPath -Raw
+            if (-not [string]::IsNullOrWhiteSpace($raw)) {
+                $existing = @($raw | ConvertFrom-Json)
+            }
+        }
+
+        $entry = [pscustomobject]@{
+            TimestampUtc = (Get-Date).ToUniversalTime().ToString('o')
+            PackId       = $Result.Pack.id
+            PackName     = $Result.Pack.name
+            Snapshot     = (Split-Path -Leaf $exportedSnapshot)
+            Html         = (Split-Path -Leaf $exportedHtml)
+            Excel        = (Split-Path -Leaf $excelPath)
+        }
+
+        $updated = @($existing + $entry)
+        $updated | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $indexPath -Encoding utf8
+    }
+    catch {
+        Write-Verbose "Failed to update insight briefing index: $($_.Exception.Message)"
+    }
+
     return [pscustomobject]@{
         PackId       = $Result.Pack.id
         SnapshotPath = $exportedSnapshot

@@ -1,0 +1,83 @@
+{
+  "id": "gc.dataActions.failures.enriched.v1",
+  "name": "Data Action Failures (Enriched)",
+  "version": "1.0.0",
+  "description": "Ranks Data Actions by failures for a time window and enriches results with action + integration metadata and response-code breakdowns.",
+  "tags": ["data-actions", "integrations", "reliability", "triage"],
+  "parameters": {
+    "startDate": {
+      "type": "string",
+      "required": true,
+      "description": "ISO-8601 UTC start timestamp (e.g. 2025-12-01T00:00:00Z)."
+    },
+    "endDate": {
+      "type": "string",
+      "required": true,
+      "description": "ISO-8601 UTC end timestamp (e.g. 2025-12-08T00:00:00Z)."
+    },
+    "interval": {
+      "type": "string",
+      "default": "PT1H",
+      "description": "Analytics aggregation interval (e.g. PT15M, PT1H, P1D)."
+    },
+    "topN": {
+      "type": "int",
+      "default": 10,
+      "description": "How many actions to enrich and report."
+    }
+  },
+  "pipeline": [
+    {
+      "id": "actionsAgg",
+      "type": "gcRequest",
+      "method": "POST",
+      "uri": "/api/v2/analytics/actions/aggregates/query",
+      "bodyTemplate": {
+        "interval": "{{interval}}",
+        "filter": {
+          "type": "or",
+          "clauses": []
+        },
+        "metrics": ["oTotalCount", "oErrorCount"],
+        "groupBy": ["actionId"],
+        "timeZone": "UTC"
+      }
+    },
+    {
+      "id": "topActions",
+      "type": "compute",
+      "script": "param($ctx)\n$rows = @($ctx.Data.actionsAgg.results)\n$rows | Sort-Object -Property { $_.data.oErrorCount } -Descending | Select-Object -First ([int]$ctx.Parameters.topN)\n"
+    },
+    {
+      "id": "responseCodesAgg",
+      "type": "gcRequest",
+      "method": "POST",
+      "uri": "/api/v2/analytics/actions/aggregates/query",
+      "bodyTemplate": {
+        "interval": "{{interval}}",
+        "filter": {
+          "type": "or",
+          "clauses": []
+        },
+        "metrics": ["oErrorCount"],
+        "groupBy": ["actionId", "responseCode"],
+        "timeZone": "UTC"
+      }
+    },
+    {
+      "id": "enrichedTopActions",
+      "type": "compute",
+      "script": "param($ctx)\n$top = @($ctx.Data.topActions)\n$codes = @($ctx.Data.responseCodesAgg.results)\n\nfunction SafeInt($v) { if ($null -eq $v) { return 0 } try { return [int]$v } catch { return 0 } }\n\n$enriched = foreach ($row in $top) {\n  $actionId = $row.group.actionId\n  $total = SafeInt $row.data.oTotalCount\n  $errors = SafeInt $row.data.oErrorCount\n  $rate = if ($total -gt 0) { [math]::Round(($errors / $total) * 100, 2) } else { $null }\n\n  $action = $null\n  try {\n    $action = Invoke-GCRequest -Method GET -Path (\"/api/v2/integrations/actions/{0}\" -f $actionId)\n  } catch {}\n\n  $integration = $null\n  $integrationId = $null\n  if ($action -and ($action.PSObject.Properties.Name -contains 'integrationId')) {\n    $integrationId = $action.integrationId\n    if ($integrationId) {\n      try {\n        $integration = Invoke-GCRequest -Method GET -Path (\"/api/v2/integrations/{0}\" -f $integrationId)\n      } catch {}\n    }\n  }\n\n  $actionName = if ($action -and $action.name) { $action.name } else { $actionId }\n  $category = if ($action -and ($action.PSObject.Properties.Name -contains 'category') -and $action.category) { $action.category } else { $null }\n  $integrationName = if ($integration -and $integration.name) { $integration.name } else { $null }\n\n  $codeRows = $codes | Where-Object { $_.group.actionId -eq $actionId }\n  $topCodes = $codeRows | Sort-Object -Property { $_.data.oErrorCount } -Descending | Select-Object -First 5 | ForEach-Object {\n    [pscustomobject]@{ responseCode = $_.group.responseCode; errorCount = (SafeInt $_.data.oErrorCount) }\n  }\n\n  [pscustomobject]@{\n    actionId = $actionId\n    actionName = $actionName\n    category = $category\n    integrationId = $integrationId\n    integrationName = $integrationName\n    totalCount = $total\n    errorCount = $errors\n    errorRatePercent = $rate\n    topResponseCodes = @($topCodes)\n  }\n}\n\n$enriched | Sort-Object errorCount -Descending\n"
+    },
+    {
+      "id": "metricTopFailures",
+      "type": "metric",
+      "script": "param($ctx)\n$items = @($ctx.Data.enrichedTopActions)\n$headline = if ($items.Count -gt 0) { $items[0] } else { $null }\n[pscustomobject]@{\n  title = 'Top Data Actions by Error Count (Enriched)'\n  value = $items.Count\n  items = $items\n  headline = $headline\n}\n"
+    },
+    {
+      "id": "drilldownTopFailures",
+      "type": "drilldown",
+      "script": "param($ctx)\n$items = @($ctx.Data.enrichedTopActions)\n[pscustomobject]@{\n  title='Top Failures (Enriched)'\n  items=$items\n}\n"
+    }
+  ]
+}
