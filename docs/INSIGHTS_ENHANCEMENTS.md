@@ -5,7 +5,7 @@ This is a working checklist for making Insight Packs more powerful and the resul
 ## Pack authoring & validation
 
 - [x] Add typed parameter definitions (`type`, `required`, `default`, `description`) across existing packs and UI parameter capture.
-- [ ] Validate packs against `insights/schema/insightpack.schema.json` (optional strict mode).
+- [x] Validate packs against `insights/schema/insightpack.schema.json` (optional strict mode).
 - [x] Add a `dryRun` mode: resolve templates + show planned requests without calling APIs.
 - [x] Add baseline comparison runner (previous window) for packs that accept `startDate`/`endDate`.
 - [x] Add a pack catalog UI + dynamic parameter rendering in Ops Console.
@@ -19,18 +19,18 @@ This is a working checklist for making Insight Packs more powerful and the resul
 - [x] Add `assert` step type (fail fast with a clear message when expected conditions are not met).
 - [x] Add `foreach` step type to fan out requests/computations across a list.
 - [x] Add `jobPoll` helper step type for analytics jobs endpoints.
-- [ ] Add `cache` step type (file cache keyed by pack id + params + timeframe).
-- [ ] Add `join` helpers for enriching IDs to names (queues/users/data actions).
+- [x] Add `cache` step type (file cache keyed by pack id + params + timeframe).
+- [x] Add `join` helpers for enriching IDs to names (queues/users/data actions).
 
 ## Evidence & briefing quality
 
-- [ ] Evidence model: `severity`, `impact`, `likelyCauses`, `recommendedActions`, and “why this matters” narrative.
-- [ ] Baselines: compare the selected window vs prior window (or 7/30 day baseline) and highlight deltas.
-- [ ] “Blast radius” enrichment: link failures to affected integrations/flows/queues where possible.
+- [x] Evidence model: `severity`, `impact`, `likelyCauses`, `recommendedActions`, and “why this matters” narrative.
+- [x] Baselines: compare the selected window vs prior window (or 7/30 day baseline) and highlight deltas.
+- [ ] “Blast radius” enrichment: link failures to affected integrations/flows/queues where possible (Data Actions pack includes Integrations/Actions; Queue Smoke pack includes Queues; flows TBD).
 
 ## Discoverability & governance
 
-- [ ] Pack catalog/index (tags, owner, scopes/permissions, expected runtime, maturity, examples).
+- [x] Pack catalog/index (tags, owner, scopes/permissions, expected runtime, maturity, examples).
 - [x] Pack testing harness (`Invoke-GCInsightPackTest`) with fixtures + snapshot assertions for computed metrics.
 - [x] Append export entries to a briefings `index.json` for lightweight run history.
 - [x] Load and browse briefing history from `index.json` in the Ops Console.
@@ -41,7 +41,7 @@ This is a working checklist for making Insight Packs more powerful and the resul
 - [x] Add a “time window” picker (WoW/MoM presets) that feeds `startDate`/`endDate` for packs.
 - [x] Improve briefing HTML for compare runs (deltas, highlights, and “what changed” narrative).
 - [x] Add a basic pack “Examples” area (recommended params + expected runtime) shown in the catalog.
-- [ ] Add stronger pack validation + friendly parameter errors (schema strict mode).
+- [x] Add stronger pack validation + friendly parameter errors (schema strict mode).
 
 ## Packs added (initial set)
 

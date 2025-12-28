@@ -40,11 +40,24 @@ function New-GCInsightComparisonEvidencePacket {
     $idStamp = (Get-Date -Format 'yyyyMMddHHmmss')
     $evidenceId = "{0}-compare-{1}" -f ($Pack.id -replace '[^A-Za-z0-9_\-]', '_'), $idStamp
 
-    return [pscustomobject]@{
+    $severity = 'Info'
+    if ($worsened.Count -gt 0) { $severity = 'Warning' }
+    if ($worsened.Count -ge 3) { $severity = 'Critical' }
+
+    $base = [pscustomobject]@{
         EvidenceId     = $evidenceId
         PackId         = $Pack.id
         PackName       = $Pack.name
         GeneratedUtc   = (Get-Date).ToUniversalTime()
+        Severity       = $severity
+        Impact         = 'Week-over-week / month-over-month deltas detected.'
+        LikelyCauses   = @()
+        RecommendedActions = @(
+            'Review the largest worsened metrics and drill into contributing entities.',
+            'Correlate the delta window to recent releases/config changes and downstream availability.'
+        )
+        WhyThisMatters = 'Leadership needs trendlines, not snapshots. Deltas highlight regressions and improvements.'
+        BlastRadius    = $null
         Narrative      = ($parts -join ' | ')
         DrilldownNotes = "Current vs baseline comparison; see drilldowns for per-metric deltas."
         Metrics        = @($CurrentResult.Metrics)
@@ -55,5 +68,15 @@ function New-GCInsightComparisonEvidencePacket {
             Metrics   = @($MetricComparisons)
         }
     }
+
+    if ($CurrentResult.PSObject.Properties.Name -contains 'EvidenceOverride' -and $CurrentResult.EvidenceOverride) {
+        foreach ($prop in @($CurrentResult.EvidenceOverride.PSObject.Properties)) {
+            $name = [string]$prop.Name
+            $value = $prop.Value
+            $base | Add-Member -MemberType NoteProperty -Name $name -Value $value -Force
+        }
+    }
+
+    return $base
 }
 ### END FILE: Private\New-GCInsightComparisonEvidencePacket.ps1

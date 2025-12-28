@@ -30,21 +30,30 @@ function Invoke-GCInsightPackCompare {
             throw "BaselineParameters not provided; Parameters must include 'startDate' and 'endDate' to derive a baseline window."
         }
 
-        try { $currentStart = [datetime]$Parameters.startDate } catch { throw "Parameters.startDate must be parseable as datetime." }
-        try { $currentEnd = [datetime]$Parameters.endDate } catch { throw "Parameters.endDate must be parseable as datetime." }
+        function Parse-GcUtc {
+            param([Parameter(Mandatory)][string]$Value)
+            return [datetime]::Parse(
+                $Value,
+                [System.Globalization.CultureInfo]::InvariantCulture,
+                [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+            )
+        }
+
+        try { $currentStart = Parse-GcUtc -Value ([string]$Parameters.startDate) } catch { throw "Parameters.startDate must be parseable as datetime." }
+        try { $currentEnd = Parse-GcUtc -Value ([string]$Parameters.endDate) } catch { throw "Parameters.endDate must be parseable as datetime." }
         if ($currentEnd -le $currentStart) { throw "Parameters.endDate must be after Parameters.startDate." }
 
         $BaselineParameters = @{}
         foreach ($k in $Parameters.Keys) { $BaselineParameters[$k] = $Parameters[$k] }
 
         if ($BaselineMode -eq 'ShiftDays') {
-            $BaselineParameters.startDate = $currentStart.AddDays(-1 * $BaselineShiftDays).ToString('o')
-            $BaselineParameters.endDate = $currentEnd.AddDays(-1 * $BaselineShiftDays).ToString('o')
+            $BaselineParameters.startDate = $currentStart.AddDays(-1 * $BaselineShiftDays).ToUniversalTime().ToString('o')
+            $BaselineParameters.endDate = $currentEnd.AddDays(-1 * $BaselineShiftDays).ToUniversalTime().ToString('o')
         }
         else {
             $span = ($currentEnd - $currentStart)
-            $BaselineParameters.startDate = $currentStart.Subtract($span).ToString('o')
-            $BaselineParameters.endDate = $currentStart.ToString('o')
+            $BaselineParameters.startDate = $currentStart.Subtract($span).ToUniversalTime().ToString('o')
+            $BaselineParameters.endDate = $currentStart.ToUniversalTime().ToString('o')
         }
     }
 

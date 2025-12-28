@@ -7,6 +7,7 @@
   "owner": "tests",
   "expectedRuntimeSec": 1,
   "scopes": ["users:read"],
+  "evidenceScript": "param($ctx)\nreturn [pscustomobject]@{\n  Severity = 'Info'\n  Impact = 'Offline fixture run.'\n  LikelyCauses = @('none')\n  RecommendedActions = @('none')\n  WhyThisMatters = 'Proves evidence plumbing works.'\n}\n",
   "parameters": {},
   "pipeline": [
     {

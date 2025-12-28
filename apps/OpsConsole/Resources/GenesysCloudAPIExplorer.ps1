@@ -40,6 +40,26 @@ function Launch-Url {
     Open-Url -Url $Url
 }
 
+function Get-FirstNonEmptyValue {
+    param(
+        [Parameter(Mandatory)]
+        [object[]]$Values,
+        [Parameter()]
+        [object]$Default = $null
+    )
+
+    foreach ($v in $Values) {
+        if ($null -eq $v) { continue }
+        if ($v -is [string]) {
+            if (-not [string]::IsNullOrWhiteSpace($v)) { return $v }
+        }
+        else {
+            return $v
+        }
+    }
+    return $Default
+}
+
 function Get-InsightPackCatalog {
     param(
         [Parameter(Mandatory)]
@@ -68,8 +88,8 @@ function Get-InsightPackCatalog {
                     foreach ($ex in @($pack.examples)) {
                         if (-not $ex) { continue }
                         $examples += [pscustomobject]@{
-                            Title      = [string]($ex.title ?? $ex.name ?? 'Example')
-                            Notes      = [string]($ex.notes ?? '')
+                            Title      = [string](Get-FirstNonEmptyValue -Values @($ex.title, $ex.name) -Default 'Example')
+                            Notes      = [string](Get-FirstNonEmptyValue -Values @($ex.notes) -Default '')
                             Parameters = $ex.parameters
                         }
                     }
@@ -77,15 +97,29 @@ function Get-InsightPackCatalog {
 
                 $items.Add([pscustomobject]@{
                     Id          = [string]$pack.id
-                    Name        = [string]($pack.name ?? $pack.id)
-                    Version     = [string]($pack.version ?? '')
-                    Description = [string]($pack.description ?? '')
-                    Scopes      = @($pack.scopes ?? $pack.requiredScopes)
-                    Owner       = [string]($pack.owner ?? '')
-                    Maturity    = [string]($pack.maturity ?? '')
+                    Name        = [string](Get-FirstNonEmptyValue -Values @($pack.name, $pack.id) -Default $pack.id)
+                    Version     = [string](Get-FirstNonEmptyValue -Values @($pack.version) -Default '')
+                    Description = [string](Get-FirstNonEmptyValue -Values @($pack.description) -Default '')
+                    Scopes      = @(Get-FirstNonEmptyValue -Values @($pack.scopes, $pack.requiredScopes) -Default @())
+                    Owner       = [string](Get-FirstNonEmptyValue -Values @($pack.owner) -Default '')
+                    Maturity    = [string](Get-FirstNonEmptyValue -Values @($pack.maturity) -Default '')
                     ExpectedRuntimeSec = if ($pack.PSObject.Properties.Name -contains 'expectedRuntimeSec') { $pack.expectedRuntimeSec } else { $null }
                     Tags        = @($pack.tags)
-                    Endpoints   = @(@($pack.pipeline) | Where-Object { $_ -and $_.type -and ($_.type.ToString().ToLowerInvariant() -eq 'gcrequest') } | ForEach-Object { $_.uri ?? $_.path } | Where-Object { $_ })
+                    Endpoints   = @(
+                        foreach ($step in @($pack.pipeline)) {
+                            if (-not $step -or -not $step.type) { continue }
+                            $t = $step.type.ToString().ToLowerInvariant()
+                            if ($t -eq 'gcrequest') {
+                                (Get-FirstNonEmptyValue -Values @($step.uri, $step.path) -Default $null)
+                            }
+                            elseif ($t -eq 'jobpoll' -and $step.create) {
+                                (Get-FirstNonEmptyValue -Values @($step.create.uri, $step.create.path) -Default $null)
+                            }
+                            elseif ($t -eq 'join' -and $step.lookup) {
+                                (Get-FirstNonEmptyValue -Values @($step.lookup.uri, $step.lookup.path) -Default $null)
+                            }
+                        }
+                    ) | Where-Object { $_ }
                     Examples    = $examples
                     FileName    = $_.Name
                     FullPath    = $_.FullName
@@ -4805,18 +4839,17 @@ $Xaml = @"
         <MenuItem Name="HelpSupportLink" Header="Genesys Support"/>
       </MenuItem>
     </Menu>
-    <Grid Margin="10">
-    <Grid.RowDefinitions>
-      <RowDefinition Height="Auto"/>
-      <RowDefinition Height="Auto"/>
-      <RowDefinition Height="Auto"/>
-      <RowDefinition Height="Auto"/>
-      <RowDefinition Height="*"/>
-      <RowDefinition Height="Auto"/>
-      <RowDefinition Height="Auto"/>
-      <RowDefinition Height="Auto"/>
-      <RowDefinition Height="2*"/>
-    </Grid.RowDefinitions>
+	    <Grid Margin="10">
+	    <Grid.RowDefinitions>
+	      <RowDefinition Height="Auto"/>
+	      <RowDefinition Height="Auto"/>
+	      <RowDefinition Height="Auto"/>
+	      <RowDefinition Height="Auto"/>
+	      <RowDefinition Height="Auto"/>
+	      <RowDefinition Height="Auto"/>
+	      <RowDefinition Height="Auto"/>
+	      <RowDefinition Height="*"/>
+	    </Grid.RowDefinitions>
 
     <TextBlock Grid.Row="0" Text="Genesys Cloud API Explorer" FontSize="20" FontWeight="Bold" Margin="0 0 0 10"/>
 
@@ -4828,7 +4861,7 @@ $Xaml = @"
       <TextBlock Name="TokenStatusText" VerticalAlignment="Center" Foreground="Gray" Text="Not tested"/>
     </StackPanel>
 
-    <Grid Grid.Row="2" Margin="0 0 0 10">
+	    <Grid Grid.Row="2" Name="RequestSelectorGrid" Margin="0 0 0 10">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="*"/>
@@ -4939,7 +4972,7 @@ $Xaml = @"
       </Border>
     </Expander>
 
-    <Border Grid.Row="5" BorderBrush="LightGray" BorderThickness="1" Padding="10" Margin="0 0 0 10">
+	    <Border Grid.Row="5" Name="FavoritesBorder" BorderBrush="LightGray" BorderThickness="1" Padding="10" Margin="0 0 0 10">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="2*"/>
@@ -4958,7 +4991,7 @@ $Xaml = @"
       </Grid>
     </Border>
 
-    <StackPanel Grid.Row="6" Orientation="Horizontal" VerticalAlignment="Center" Margin="0 0 0 10">
+	    <StackPanel Grid.Row="6" Name="ActionButtonsPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0 0 0 10">
       <Button Name="SubmitButton" Width="150" Height="34" Content="Submit API Call" Margin="0 0 10 0"/>
       <Button Name="SaveButton" Width="150" Height="34" Content="Save Response" IsEnabled="False" Margin="0 0 10 0"/>
       <Button Name="ExportPowerShellButton" Width="150" Height="34" Content="Export PowerShell" Margin="0 0 10 0" ToolTip="Generate PowerShell script for this request"/>
@@ -4967,7 +5000,7 @@ $Xaml = @"
       <TextBlock Name="StatusText" VerticalAlignment="Center" Foreground="SlateGray" Margin="5 0 0 0"/>
     </StackPanel>
 
-    <TabControl Grid.Row="7" VerticalAlignment="Stretch">
+	    <TabControl Grid.Row="7" Name="MainTabControl" VerticalAlignment="Stretch">
       <TabItem Header="Response">
         <Grid>
           <Grid.RowDefinitions>
@@ -5072,6 +5105,8 @@ $Xaml = @"
                 <Grid.RowDefinitions>
                   <RowDefinition Height="Auto"/>
                   <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
                   <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
@@ -5085,9 +5120,11 @@ $Xaml = @"
                             ToolTip="Select an Insight Pack from insights/packs"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <WrapPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                   <Button Name="RunSelectedInsightPackButton" Width="120" Height="30" Content="Run"/>
-                  <Button Name="CompareSelectedInsightPackButton" Width="140" Height="30" Content="Compare (Prev)" Margin="10 0 0 0"/>
+                  <Button Name="CompareSelectedInsightPackButton" Width="140" Height="30" Content="Compare" Margin="10 0 0 0"/>
+                  <ComboBox Name="InsightBaselineModeCombo" Width="150" Height="26" Margin="8 2 0 0"
+                            ToolTip="Baseline selection for Compare runs"/>
                   <Button Name="DryRunSelectedInsightPackButton" Width="110" Height="30" Content="Dry Run" Margin="10 0 0 0"/>
                   <CheckBox Name="UseInsightCacheCheckbox" Content="Cache" VerticalAlignment="Center" Margin="14 0 0 0" IsChecked="True"
                             ToolTip="Cache gcRequest steps to disk (file+TTL)"/>
@@ -5097,7 +5134,7 @@ $Xaml = @"
                   <TextBox Name="InsightCacheTtlInput" Width="60" Height="26" VerticalContentAlignment="Center" Text="60"
                            ToolTip="Cache time-to-live in minutes"/>
                   <Button Name="ExportInsightBriefingButton" Width="130" Height="30" Content="Export Briefing" Margin="10 0 0 0" IsEnabled="False"/>
-                </StackPanel>
+                </WrapPanel>
 
                 <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0 8 0 8">
                   <Grid.ColumnDefinitions>
@@ -5139,7 +5176,7 @@ $Xaml = @"
                   <TextBlock Name="InsightPackWarningsText" Text=" " TextWrapping="Wrap" Foreground="#6B4E00"/>
                 </Border>
 
-                <ScrollViewer Grid.Row="4" Grid.ColumnSpan="2" VerticalScrollBarVisibility="Auto" MaxHeight="240">
+                <ScrollViewer Grid.Row="4" Grid.ColumnSpan="2" VerticalScrollBarVisibility="Auto">
                   <StackPanel Name="InsightPackParametersPanel"/>
                 </ScrollViewer>
               </Grid>
@@ -5164,7 +5201,7 @@ $Xaml = @"
               <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <GroupBox Header="Metrics" Grid.Column="0" Margin="0 0 10 0">
-              <ListView Name="InsightMetricsList" Height="220">
+              <ListView Name="InsightMetricsList">
                 <ListView.View>
                   <GridView>
                     <GridViewColumn Header="Title" DisplayMemberBinding="{Binding Title}" Width="220"/>
@@ -5175,7 +5212,7 @@ $Xaml = @"
               </ListView>
             </GroupBox>
             <GroupBox Header="Drilldowns" Grid.Column="1">
-              <ListView Name="InsightDrilldownsList" Height="220">
+              <ListView Name="InsightDrilldownsList">
                 <ListView.View>
                   <GridView>
                     <GridViewColumn Header="Title" DisplayMemberBinding="{Binding Title}" Width="160"/>
@@ -5345,12 +5382,17 @@ $resetEndpointsMenuItem = $Window.FindName("ResetEndpointsMenuItem")
 $requestHistoryList = $Window.FindName("RequestHistoryList")
 $replayRequestButton = $Window.FindName("ReplayRequestButton")
 $clearHistoryButton = $Window.FindName("ClearHistoryButton")
+$mainTabControl = $Window.FindName("MainTabControl")
+$requestSelectorGrid = $Window.FindName("RequestSelectorGrid")
+$favoritesBorder = $Window.FindName("FavoritesBorder")
+$actionButtonsPanel = $Window.FindName("ActionButtonsPanel")
  $runQueueSmokePackButton = $Window.FindName("RunQueueSmokePackButton")
  $runDataActionsPackButton = $Window.FindName("RunDataActionsPackButton")
  $runDataActionsEnrichedPackButton = $Window.FindName("RunDataActionsEnrichedPackButton")
  $runPeakConcurrencyPackButton = $Window.FindName("RunPeakConcurrencyPackButton")
  $runSelectedInsightPackButton = $Window.FindName("RunSelectedInsightPackButton")
  $compareSelectedInsightPackButton = $Window.FindName("CompareSelectedInsightPackButton")
+ $insightBaselineModeCombo = $Window.FindName("InsightBaselineModeCombo")
  $dryRunSelectedInsightPackButton = $Window.FindName("DryRunSelectedInsightPackButton")
  $useInsightCacheCheckbox = $Window.FindName("UseInsightCacheCheckbox")
  $strictInsightValidationCheckbox = $Window.FindName("StrictInsightValidationCheckbox")
@@ -5387,6 +5429,7 @@ $importTemplatesButton = $Window.FindName("ImportTemplatesButton")
 $filterBuilderBorder = $Window.FindName("FilterBuilderBorder")
 $filterBuilderHintText = $Window.FindName("FilterBuilderHintText")
 $filterBuilderExpander = $Window.FindName("FilterBuilderExpander")
+$parametersExpander = $Window.FindName("ParametersExpander")
 $filterIntervalInput = $Window.FindName("FilterIntervalInput")
 $refreshFiltersButton = $Window.FindName("RefreshFiltersButton")
 $resetFiltersButton = $Window.FindName("ResetFiltersButton")
@@ -5486,6 +5529,82 @@ if ($filterBuilderBorder) {
                 Refresh-FilterList -Scope "Segment"
             })
     }
+}
+
+if (-not $script:LayoutDefaultsCaptured) {
+    $script:LayoutDefaultsCaptured = $true
+    $script:LayoutDefaults = [pscustomobject]@{
+        RequestSelectorVisibility = if ($requestSelectorGrid) { $requestSelectorGrid.Visibility } else { $null }
+        FavoritesVisibility       = if ($favoritesBorder) { $favoritesBorder.Visibility } else { $null }
+        ActionButtonsVisibility   = if ($actionButtonsPanel) { $actionButtonsPanel.Visibility } else { $null }
+        ParametersVisibility      = if ($parametersExpander) { $parametersExpander.Visibility } else { $null }
+        ParametersExpanded        = if ($parametersExpander) { [bool]$parametersExpander.IsExpanded } else { $false }
+        FilterBuilderVisibility   = if ($filterBuilderExpander) { $filterBuilderExpander.Visibility } else { $null }
+        FilterBuilderExpanded     = if ($filterBuilderExpander) { [bool]$filterBuilderExpander.IsExpanded } else { $false }
+    }
+}
+
+function Set-FocusLayoutForMainTab {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Header
+    )
+
+    $isOpsInsights = ($Header -eq 'Ops Insights')
+    if ($isOpsInsights) {
+        if ($requestSelectorGrid) { $requestSelectorGrid.Visibility = 'Collapsed' }
+        if ($favoritesBorder) { $favoritesBorder.Visibility = 'Collapsed' }
+        if ($actionButtonsPanel) { $actionButtonsPanel.Visibility = 'Collapsed' }
+        if ($parametersExpander) {
+            $parametersExpander.IsExpanded = $false
+            $parametersExpander.Visibility = 'Collapsed'
+        }
+        if ($filterBuilderExpander) {
+            $filterBuilderExpander.IsExpanded = $false
+            $filterBuilderExpander.Visibility = 'Collapsed'
+        }
+        return
+    }
+
+    # Restore defaults for non-Ops Insights tabs
+    if ($script:LayoutDefaults) {
+        if ($requestSelectorGrid -and $null -ne $script:LayoutDefaults.RequestSelectorVisibility) { $requestSelectorGrid.Visibility = $script:LayoutDefaults.RequestSelectorVisibility }
+        if ($favoritesBorder -and $null -ne $script:LayoutDefaults.FavoritesVisibility) { $favoritesBorder.Visibility = $script:LayoutDefaults.FavoritesVisibility }
+        if ($actionButtonsPanel -and $null -ne $script:LayoutDefaults.ActionButtonsVisibility) { $actionButtonsPanel.Visibility = $script:LayoutDefaults.ActionButtonsVisibility }
+
+        if ($parametersExpander -and $null -ne $script:LayoutDefaults.ParametersVisibility) {
+            $parametersExpander.Visibility = $script:LayoutDefaults.ParametersVisibility
+            $parametersExpander.IsExpanded = [bool]$script:LayoutDefaults.ParametersExpanded
+        }
+
+        if ($filterBuilderExpander -and $null -ne $script:LayoutDefaults.FilterBuilderVisibility) {
+            $filterBuilderExpander.Visibility = $script:LayoutDefaults.FilterBuilderVisibility
+            $filterBuilderExpander.IsExpanded = [bool]$script:LayoutDefaults.FilterBuilderExpanded
+        }
+    }
+}
+
+if ($mainTabControl) {
+    $mainTabControl.Add_SelectionChanged({
+            param($sender, $e)
+            try {
+                if ($e.OriginalSource -ne $sender) { return }
+                $selected = $sender.SelectedItem
+                if (-not $selected) { return }
+                $header = [string]$selected.Header
+                if ([string]::IsNullOrWhiteSpace($header)) { return }
+                Set-FocusLayoutForMainTab -Header $header
+            }
+            catch {
+                # Don't break the UI for layout issues
+            }
+        })
+
+    try {
+        $initial = $mainTabControl.SelectedItem
+        if ($initial) { Set-FocusLayoutForMainTab -Header ([string]$initial.Header) }
+    }
+    catch { }
 }
 $script:LastConversationReport = $null
 $script:LastConversationReportJson = ""
@@ -5647,7 +5766,7 @@ function Update-InsightPackUi {
     }
 
     foreach ($drilldown in $drilldowns) {
-        $title = if ($drilldown.PSObject.Properties.Name -contains 'title') { $drilldown.title } else { ($drilldown.Id ?? 'drilldown') }
+        $title = if ($drilldown.PSObject.Properties.Name -contains 'title') { $drilldown.title } elseif (($drilldown.PSObject.Properties.Name -contains 'Id') -and $drilldown.Id) { $drilldown.Id } else { 'drilldown' }
         $rowCount = if ($drilldown.PSObject.Properties.Name -contains 'items') { (@($drilldown.items)).Count } else { 0 }
         $summary = if ($rowCount -gt 0) { "$rowCount rows" } else { '' }
         $script:InsightDrilldowns.Add([pscustomobject]@{
@@ -5659,9 +5778,11 @@ function Update-InsightPackUi {
 
     if ($insightEvidenceSummary) {
         $evidence = $Result.Evidence
+        $severity = if ($evidence -and ($evidence.PSObject.Properties.Name -contains 'Severity')) { $evidence.Severity } else { 'Info' }
+        $impact = if ($evidence -and ($evidence.PSObject.Properties.Name -contains 'Impact')) { $evidence.Impact } else { '' }
         $narrative = if ($evidence) { $evidence.Narrative } else { '(No narrative available)' }
         $drillNotes = if ($evidence) { $evidence.DrilldownNotes } else { '' }
-        $insightEvidenceSummary.Text = "Narrative: $narrative`nDrilldowns: $drillNotes"
+        $insightEvidenceSummary.Text = "Severity: $severity`nImpact: $impact`nNarrative: $narrative`nDrilldowns: $drillNotes"
     }
 }
 
@@ -6886,7 +7007,7 @@ if ($insightPackCombo) {
 	            if ($insightPackMetaText) {
                 $tags = if ($selected.Tags -and $selected.Tags.Count -gt 0) { ($selected.Tags -join ', ') } else { '' }
                 $scopes = if ($selected.Scopes -and $selected.Scopes.Count -gt 0) { ($selected.Scopes -join ', ') } else { '' }
-                $endpoints = if ($selected.Endpoints -and $selected.Endpoints.Count -gt 0) { ($selected.Endpoints -join "`n") } else { '' }
+                    $endpoints = if ($selected.Endpoints -and $selected.Endpoints.Count -gt 0) { ($selected.Endpoints -join "`n") } else { '' }
 
                 $lines = New-Object System.Collections.Generic.List[string]
                 if ($selected.Version) { $lines.Add("Version: $($selected.Version)") | Out-Null }
@@ -6896,10 +7017,10 @@ if ($insightPackCombo) {
                 if ($tags) { $lines.Add("Tags: $tags") | Out-Null }
                 if ($scopes) { $lines.Add("Scopes: $scopes") | Out-Null }
                 if ($selected.FullPath) { $lines.Add("Path: $($selected.FullPath)") | Out-Null }
-	                if ($endpoints) {
-	                    $lines.Add("Endpoints:") | Out-Null
-	                    $lines.Add($endpoints) | Out-Null
-	                }
+                if ($endpoints) {
+                    $lines.Add("Endpoints:") | Out-Null
+                    $lines.Add($endpoints) | Out-Null
+                }
 	                if ($selected.Examples -and $selected.Examples.Count -gt 0) {
 	                    $lines.Add("Examples:") | Out-Null
 	                    foreach ($ex in @($selected.Examples)) {
@@ -6974,6 +7095,17 @@ if ($insightTimePresetCombo) {
     $insightTimePresetCombo.DisplayMemberPath = 'Name'
     $insightTimePresetCombo.SelectedValuePath = 'Key'
     $insightTimePresetCombo.SelectedValue = 'last7'
+}
+
+if ($insightBaselineModeCombo) {
+    $insightBaselineModeCombo.ItemsSource = @(
+        [pscustomobject]@{ Key = 'PreviousWindow'; Name = 'Prev window' },
+        [pscustomobject]@{ Key = 'ShiftDays7'; Name = 'Shift -7 days' },
+        [pscustomobject]@{ Key = 'ShiftDays30'; Name = 'Shift -30 days' }
+    )
+    $insightBaselineModeCombo.DisplayMemberPath = 'Name'
+    $insightBaselineModeCombo.SelectedValuePath = 'Key'
+    $insightBaselineModeCombo.SelectedValue = 'PreviousWindow'
 }
 
 function Apply-InsightTimePresetToUi {
@@ -7095,7 +7227,16 @@ function Run-SelectedInsightPack {
     }
 
 	    if ($Compare) {
-	        $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -StrictValidation:$strictValidate
+	        $baselineKey = if ($insightBaselineModeCombo) { [string]$insightBaselineModeCombo.SelectedValue } else { 'PreviousWindow' }
+	        if ($baselineKey -eq 'ShiftDays7') {
+	            $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -BaselineMode ShiftDays -BaselineShiftDays 7 -StrictValidation:$strictValidate
+	        }
+	        elseif ($baselineKey -eq 'ShiftDays30') {
+	            $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -BaselineMode ShiftDays -BaselineShiftDays 30 -StrictValidation:$strictValidate
+	        }
+	        else {
+	            $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -BaselineMode PreviousWindow -StrictValidation:$strictValidate
+	        }
 	    }
 	    else {
 	        if ($DryRun) {

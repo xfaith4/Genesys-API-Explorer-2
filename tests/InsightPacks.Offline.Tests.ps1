@@ -21,7 +21,8 @@ Describe 'Insight Packs (Offline)' {
         $result.MissingFixtures.Count | Should -Be 0
         $result.Result.Metrics.Count | Should -BeGreaterThan 0
         $result.Result.Metrics[0].value | Should -Be 'Test User'
+        $result.Result.Evidence.Severity | Should -Be 'Info'
+        $result.Result.Evidence.Impact | Should -Be 'Offline fixture run.'
     }
 }
 ### END FILE: tests\InsightPacks.Offline.Tests.ps1
-

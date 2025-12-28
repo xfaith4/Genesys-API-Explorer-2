@@ -8,6 +8,7 @@
   "description": "Ranks Data Actions by failures for a time window and enriches results with action + integration metadata and response-code breakdowns.",
   "scopes": ["analytics:read", "integrations:read"],
   "tags": ["data-actions", "integrations", "reliability", "triage"],
+  "evidenceScript": "param($ctx)\n\n$items = @($ctx.Data.enrichedTopActions)\n$worst = if ($items.Count -gt 0) { $items[0] } else { $null }\n$totalErrors = 0\nforeach ($i in $items) { try { $totalErrors += [int]$i.errorCount } catch {} }\n\n$severity = 'Info'\nif ($totalErrors -ge 50) { $severity = 'Warning' }\nif ($totalErrors -ge 200) { $severity = 'Critical' }\n\n$impact = if ($totalErrors -gt 0) { \"${totalErrors} Data Action errors in the selected window.\" } else { 'No Data Action errors detected in the selected window.' }\n\n$blast = [pscustomobject]@{\n  Actions = @($items | Select-Object -First 10 | ForEach-Object { if ($_.actionName) { $_.actionName } else { $_.actionId } })\n  Integrations = @($items | Where-Object { $_.integrationName } | Select-Object -First 10 -ExpandProperty integrationName)\n}\n\n$causes = New-Object System.Collections.Generic.List[string]\n$actions = New-Object System.Collections.Generic.List[string]\n$why = 'Data Action reliability is a leading indicator of downstream system health and directly impacts automation success and customer experience.'\n\nif ($worst) {\n  $causes.Add(\"Top failing action: $($worst.actionName) (integration: $((if ($worst.integrationName) { $worst.integrationName } else { 'unknown' })))\") | Out-Null\n  if ($worst.topResponseCodes -and $worst.topResponseCodes.Count -gt 0) {\n    $codes = ($worst.topResponseCodes | ForEach-Object { \"$($_.responseCode):$($_.errorCount)\" }) -join ', '\n    $causes.Add(\"Top response codes: $codes\") | Out-Null\n  }\n\n  $actions.Add('Validate integration credentials, certificates, and endpoint reachability for the associated integration.') | Out-Null\n  $actions.Add('Review the action contract mapping and recent contract changes; confirm downstream API behavior.') | Out-Null\n  $actions.Add('Inspect Architect flows that call the top failing actions for retry/timeout handling and fallback paths.') | Out-Null\n}\n\nreturn [pscustomobject]@{\n  Severity = $severity\n  Impact = $impact\n  LikelyCauses = @($causes)\n  RecommendedActions = @($actions)\n  WhyThisMatters = $why\n  BlastRadius = $blast\n}\n",
   "examples": [
     {
       "title": "Hourly failures with enrichment",
@@ -64,6 +65,40 @@
       "script": "param($ctx)\n$rows = @($ctx.Data.actionsAgg.results)\n$rows | Sort-Object -Property { $_.data.oErrorCount } -Descending | Select-Object -First ([int]$ctx.Parameters.topN)\n"
     },
     {
+      "id": "topActionStats",
+      "type": "compute",
+      "script": "param($ctx)\nfunction SafeInt($v) { if ($null -eq $v) { return 0 } try { return [int]$v } catch { return 0 } }\n$items = foreach ($row in @($ctx.Data.topActions)) {\n  $actionId = $row.group.actionId\n  [pscustomobject]@{\n    actionId = $actionId\n    totalCount = (SafeInt $row.data.oTotalCount)\n    errorCount = (SafeInt $row.data.oErrorCount)\n  }\n}\n$items\n"
+    },
+    {
+      "id": "actionsWithMeta",
+      "type": "join",
+      "sourceStepId": "topActionStats",
+      "key": "actionId",
+      "assign": "action",
+      "maxUnique": 20,
+      "lookup": {
+        "method": "GET",
+        "uri": "/api/v2/integrations/actions/{id}"
+      }
+    },
+    {
+      "id": "actionsWithIntegrationId",
+      "type": "compute",
+      "script": "param($ctx)\nforeach ($row in @($ctx.Data.actionsWithMeta)) {\n  $integrationId = $null\n  if ($row.action -and ($row.action.PSObject.Properties.Name -contains 'integrationId')) { $integrationId = $row.action.integrationId }\n  $row | Add-Member -MemberType NoteProperty -Name integrationId -Value $integrationId -Force\n  $row\n}\n"
+    },
+    {
+      "id": "actionsWithIntegration",
+      "type": "join",
+      "sourceStepId": "actionsWithIntegrationId",
+      "key": "integrationId",
+      "assign": "integration",
+      "maxUnique": 20,
+      "lookup": {
+        "method": "GET",
+        "uri": "/api/v2/integrations/{id}"
+      }
+    },
+    {
       "id": "responseCodesAgg",
       "type": "gcRequest",
       "method": "POST",
@@ -83,7 +118,7 @@
     {
       "id": "enrichedTopActions",
       "type": "compute",
-      "script": "param($ctx)\n$top = @($ctx.Data.topActions)\n$codes = @($ctx.Data.responseCodesAgg.results)\n\nfunction SafeInt($v) { if ($null -eq $v) { return 0 } try { return [int]$v } catch { return 0 } }\n\n$enriched = foreach ($row in $top) {\n  $actionId = $row.group.actionId\n  $total = SafeInt $row.data.oTotalCount\n  $errors = SafeInt $row.data.oErrorCount\n  $rate = if ($total -gt 0) { [math]::Round(($errors / $total) * 100, 2) } else { $null }\n\n  $action = $null\n  try {\n    $action = Invoke-GCRequest -Method GET -Path (\"/api/v2/integrations/actions/{0}\" -f $actionId)\n  } catch {}\n\n  $integration = $null\n  $integrationId = $null\n  if ($action -and ($action.PSObject.Properties.Name -contains 'integrationId')) {\n    $integrationId = $action.integrationId\n    if ($integrationId) {\n      try {\n        $integration = Invoke-GCRequest -Method GET -Path (\"/api/v2/integrations/{0}\" -f $integrationId)\n      } catch {}\n    }\n  }\n\n  $actionName = if ($action -and $action.name) { $action.name } else { $actionId }\n  $category = if ($action -and ($action.PSObject.Properties.Name -contains 'category') -and $action.category) { $action.category } else { $null }\n  $integrationName = if ($integration -and $integration.name) { $integration.name } else { $null }\n\n  $codeRows = $codes | Where-Object { $_.group.actionId -eq $actionId }\n  $topCodes = $codeRows | Sort-Object -Property { $_.data.oErrorCount } -Descending | Select-Object -First 5 | ForEach-Object {\n    [pscustomobject]@{ responseCode = $_.group.responseCode; errorCount = (SafeInt $_.data.oErrorCount) }\n  }\n\n  [pscustomobject]@{\n    actionId = $actionId\n    actionName = $actionName\n    category = $category\n    integrationId = $integrationId\n    integrationName = $integrationName\n    totalCount = $total\n    errorCount = $errors\n    errorRatePercent = $rate\n    topResponseCodes = @($topCodes)\n  }\n}\n\n$enriched | Sort-Object errorCount -Descending\n"
+      "script": "param($ctx)\n$rows = @($ctx.Data.actionsWithIntegration)\n$codes = @($ctx.Data.responseCodesAgg.results)\n\nfunction SafeInt($v) { if ($null -eq $v) { return 0 } try { return [int]$v } catch { return 0 } }\n\n$enriched = foreach ($row in $rows) {\n  $actionId = [string]$row.actionId\n  $total = SafeInt $row.totalCount\n  $errors = SafeInt $row.errorCount\n  $rate = if ($total -gt 0) { [math]::Round(($errors / $total) * 100, 2) } else { $null }\n\n  $action = $row.action\n  $integration = $row.integration\n\n  $integrationId = if ($row.integrationId) { [string]$row.integrationId } elseif ($action -and ($action.PSObject.Properties.Name -contains 'integrationId')) { [string]$action.integrationId } else { $null }\n\n  $actionName = if ($action -and $action.name) { [string]$action.name } else { $actionId }\n  $category = if ($action -and ($action.PSObject.Properties.Name -contains 'category') -and $action.category) { [string]$action.category } else { $null }\n  $integrationName = if ($integration -and $integration.name) { [string]$integration.name } else { $null }\n\n  $codeRows = $codes | Where-Object { $_.group.actionId -eq $actionId }\n  $topCodes = $codeRows | Sort-Object -Property { $_.data.oErrorCount } -Descending | Select-Object -First 5 | ForEach-Object {\n    [pscustomobject]@{ responseCode = $_.group.responseCode; errorCount = (SafeInt $_.data.oErrorCount) }\n  }\n\n  [pscustomobject]@{\n    actionId = $actionId\n    actionName = $actionName\n    category = $category\n    integrationId = $integrationId\n    integrationName = $integrationName\n    totalCount = $total\n    errorCount = $errors\n    errorRatePercent = $rate\n    topResponseCodes = @($topCodes)\n  }\n}\n\n$enriched | Sort-Object errorCount -Descending\n"
     },
     {
       "id": "metricTopFailures",

@@ -10,7 +10,10 @@ function Test-GCInsightPack {
         [string]$PackPath,
 
         [Parameter()]
-        [switch]$Strict
+        [switch]$Strict,
+
+        [Parameter()]
+        [switch]$Schema
     )
 
     $resolvedPackPath = Resolve-GCInsightPackPath -PackPath $PackPath
@@ -19,6 +22,9 @@ function Test-GCInsightPack {
     }
 
     $raw = Get-Content -LiteralPath $resolvedPackPath -Raw
+    if ($Schema -or $Strict) {
+        Test-GCInsightPackSchema -Json $raw | Out-Null
+    }
     $pack = $raw | ConvertFrom-Json
 
     try {
@@ -41,4 +47,3 @@ function Test-GCInsightPack {
         }
     }
 }
-

@@ -162,13 +162,13 @@ function Test-GCInsightPackDefinition {
         $stepIds[$step.id] = $true
         if (-not $step.type) { throw "Insight pack step '$($step.id)' is missing 'type'." }
 
-        $type = ([string]$step.type).ToLowerInvariant()
-        if ($Strict) {
-            $allowedTypes = @('gcrequest','compute','metric','drilldown','assert','foreach','jobpoll')
-            if ($type -notin $allowedTypes) {
-                throw "Insight pack '$($Pack.id)' step '$($step.id)' has unsupported type '$type' (allowed: $($allowedTypes -join ', '))."
-            }
-        }
+	        $type = ([string]$step.type).ToLowerInvariant()
+	        if ($Strict) {
+	            $allowedTypes = @('gcrequest','compute','metric','drilldown','assert','foreach','jobpoll','cache','join')
+	            if ($type -notin $allowedTypes) {
+	                throw "Insight pack '$($Pack.id)' step '$($step.id)' has unsupported type '$type' (allowed: $($allowedTypes -join ', '))."
+	            }
+	        }
         switch ($type) {
             'gcrequest' {
                 if (-not ($step.uri -or $step.path)) { throw "gcRequest step '$($step.id)' requires 'uri' or 'path'." }
@@ -199,6 +199,26 @@ function Test-GCInsightPackDefinition {
             'jobpoll' {
                 if (-not $step.create) { throw "JobPoll step '$($step.id)' requires 'create' definition." }
             }
+            'cache' {
+                if (-not $step.script) { throw "Cache step '$($step.id)' requires a script block." }
+                if ($step.ttlMinutes) {
+                    try {
+                        $ttl = [int]$step.ttlMinutes
+                        if ($ttl -lt 1) { throw "Cache step '$($step.id)' ttlMinutes must be >= 1." }
+                    }
+                    catch {
+                        throw "Cache step '$($step.id)' ttlMinutes must be an integer >= 1."
+                    }
+                }
+                if ($step.keyTemplate -and -not ($step.keyTemplate -is [string])) { throw "Cache step '$($step.id)' keyTemplate must be a string." }
+                if ($step.cacheDirectory -and -not ($step.cacheDirectory -is [string])) { throw "Cache step '$($step.id)' cacheDirectory must be a string." }
+            }
+            'join' {
+                if (-not $step.sourceStepId) { throw "Join step '$($step.id)' requires 'sourceStepId'." }
+                if (-not $step.key) { throw "Join step '$($step.id)' requires 'key'." }
+                if (-not $step.lookup) { throw "Join step '$($step.id)' requires 'lookup' definition." }
+                if (-not ($step.lookup.uri -or $step.lookup.path)) { throw "Join step '$($step.id)' lookup requires 'uri' or 'path'." }
+            }
         }
 
         if ($Strict -and $step.script) {
@@ -208,6 +228,56 @@ function Test-GCInsightPackDefinition {
     }
 
     return $true
+}
+
+function Get-GCInsightPackSchemaPath {
+    $moduleBase = Split-Path -Parent $PSScriptRoot
+    $candidates = @(
+        (Join-Path -Path $moduleBase -ChildPath 'schema/insightpack.schema.json'),
+        (Join-Path -Path $moduleBase -ChildPath '..\..\insights\schema\insightpack.schema.json'),
+        (Join-Path -Path (Get-Location).ProviderPath -ChildPath 'insights/schema/insightpack.schema.json')
+    )
+
+    foreach ($p in $candidates) {
+        try {
+            $resolved = (Resolve-Path -LiteralPath $p -ErrorAction Stop).ProviderPath
+            if (Test-Path -LiteralPath $resolved) { return $resolved }
+        }
+        catch { }
+    }
+    return $null
+}
+
+function Test-GCInsightPackSchema {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Json,
+
+        [Parameter()]
+        [string]$SchemaPath
+    )
+
+    $testJson = Get-Command -Name Test-Json -ErrorAction SilentlyContinue
+    if (-not $testJson) { return $true }
+
+    if (-not $SchemaPath) {
+        $SchemaPath = Get-GCInsightPackSchemaPath
+    }
+
+    if (-not $SchemaPath) { return $true }
+
+    try {
+        $ok = Test-Json -Json $Json -SchemaFile $SchemaPath -ErrorAction Stop
+        if (-not $ok) {
+            throw "Insight pack JSON does not match schema: $SchemaPath"
+        }
+        return $true
+    }
+    catch {
+        throw "Schema validation failed: $($_.Exception.Message)"
+    }
 }
 
 function Resolve-GCInsightTemplateString {

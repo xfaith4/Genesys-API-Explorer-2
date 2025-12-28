@@ -40,7 +40,8 @@ function Invoke-GCInsightPackTest {
             [Parameter()][string]$Body
         )
 
-        $source = "{0}|{1}|{2}" -f $Method.ToUpperInvariant(), $PathAndQuery, ($Body ?? '')
+        $bodyValue = if ($null -ne $Body) { [string]$Body } else { '' }
+        $source = "{0}|{1}|{2}" -f $Method.ToUpperInvariant(), $PathAndQuery, $bodyValue
         $bytes = [System.Text.Encoding]::UTF8.GetBytes($source)
         $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
         return ([System.BitConverter]::ToString($hash) -replace '-', '').ToLowerInvariant()

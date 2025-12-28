@@ -27,7 +27,10 @@ function Export-GCInsightPackHtml {
     $metrics = @($Result.Metrics)
     $steps   = @($Result.Steps)
     $drilldowns = @($Result.Drilldowns)
-    $encode  = [System.Net.WebUtility]::HtmlEncode
+    function Encode-Html {
+        param([object]$Value)
+        [System.Net.WebUtility]::HtmlEncode([string]$Value)
+    }
 
     function To-PrettyString {
         param([object]$Value)
@@ -72,8 +75,8 @@ th { background: #fafafa; }
 
     $html = New-Object System.Text.StringBuilder
     [void]$html.AppendLine("<html><head><meta charset='utf-8'/>$style</head><body>")
-    [void]$html.AppendLine("<h1>$($encode($packName))</h1>")
-    [void]$html.AppendLine("<div class='meta'>Pack: <b>$($encode($packId))</b> &nbsp; Generated (UTC): <b>$($encode($genUtc))</b></div>")
+    [void]$html.AppendLine("<h1>$((Encode-Html $packName))</h1>")
+    [void]$html.AppendLine("<div class='meta'>Pack: <b>$((Encode-Html $packId))</b> &nbsp; Generated (UTC): <b>$((Encode-Html $genUtc))</b></div>")
 
     $isCompare = Is-CompareResult -Result $Result
     if ($isCompare) {
@@ -84,15 +87,75 @@ th { background: #fafafa; }
     if ($Result.PSObject.Properties.Name -contains 'Evidence' -and $Result.Evidence) {
         $narrative = ''
         $notes = ''
+        $severity = ''
+        $impact = ''
+        $why = ''
+        $likelyCauses = @()
+        $recommended = @()
+        $blast = $null
+
         if ($Result.Evidence.PSObject.Properties.Name -contains 'Narrative') { $narrative = [string]$Result.Evidence.Narrative }
         if ($Result.Evidence.PSObject.Properties.Name -contains 'DrilldownNotes') { $notes = [string]$Result.Evidence.DrilldownNotes }
+        if ($Result.Evidence.PSObject.Properties.Name -contains 'Severity') { $severity = [string]$Result.Evidence.Severity }
+        if ($Result.Evidence.PSObject.Properties.Name -contains 'Impact') { $impact = [string]$Result.Evidence.Impact }
+        if ($Result.Evidence.PSObject.Properties.Name -contains 'WhyThisMatters') { $why = [string]$Result.Evidence.WhyThisMatters }
+        if ($Result.Evidence.PSObject.Properties.Name -contains 'LikelyCauses') { $likelyCauses = @($Result.Evidence.LikelyCauses) }
+        if ($Result.Evidence.PSObject.Properties.Name -contains 'RecommendedActions') { $recommended = @($Result.Evidence.RecommendedActions) }
+        if ($Result.Evidence.PSObject.Properties.Name -contains 'BlastRadius') { $blast = $Result.Evidence.BlastRadius }
 
         [void]$html.AppendLine("<div class='card'><h2>Evidence</h2>")
-        if (-not [string]::IsNullOrWhiteSpace($narrative)) {
-            [void]$html.AppendLine("<div><b>Narrative:</b> $($encode($narrative))</div>")
+        if (-not [string]::IsNullOrWhiteSpace($severity)) {
+            [void]$html.AppendLine("<div><b>Severity:</b> <span class='pill'>$((Encode-Html $severity))</span></div>")
         }
+        if (-not [string]::IsNullOrWhiteSpace($narrative)) {
+            [void]$html.AppendLine("<div><b>Narrative:</b> $((Encode-Html $narrative))</div>")
+        }
+        if (-not [string]::IsNullOrWhiteSpace($impact)) {
+            [void]$html.AppendLine("<div style='margin-top:6px'><b>Impact:</b> $((Encode-Html $impact))</div>")
+        }
+        if (-not [string]::IsNullOrWhiteSpace($why)) {
+            [void]$html.AppendLine("<div style='margin-top:6px'><b>Why this matters:</b> $((Encode-Html $why))</div>")
+        }
+        if ($likelyCauses.Count -gt 0) {
+            [void]$html.AppendLine("<div style='margin-top:10px'><b>Likely causes</b><ul>")
+            foreach ($c in $likelyCauses) { [void]$html.AppendLine("<li>$((Encode-Html $c))</li>") }
+            [void]$html.AppendLine("</ul></div>")
+        }
+        if ($recommended.Count -gt 0) {
+            [void]$html.AppendLine("<div style='margin-top:10px'><b>Recommended actions</b><ul>")
+            foreach ($a in $recommended) { [void]$html.AppendLine("<li>$((Encode-Html $a))</li>") }
+            [void]$html.AppendLine("</ul></div>")
+        }
+
+	        if ($blast) {
+	            $actions = @()
+	            $integrations = @()
+	            $queues = @()
+	            $flows = @()
+	            try { if ($blast.PSObject.Properties.Name -contains 'Actions') { $actions = @($blast.Actions) } } catch {}
+	            try { if ($blast.PSObject.Properties.Name -contains 'Integrations') { $integrations = @($blast.Integrations) } } catch {}
+	            try { if ($blast.PSObject.Properties.Name -contains 'Queues') { $queues = @($blast.Queues) } } catch {}
+	            try { if ($blast.PSObject.Properties.Name -contains 'Flows') { $flows = @($blast.Flows) } } catch {}
+	            if ($actions.Count -gt 0 -or $integrations.Count -gt 0 -or $queues.Count -gt 0 -or $flows.Count -gt 0) {
+	                [void]$html.AppendLine("<div style='margin-top:10px'><b>Blast radius</b><div class='kv'>")
+	                if ($actions.Count -gt 0) {
+	                    [void]$html.AppendLine("<div><b>Actions</b></div><div>$((Encode-Html (($actions | Select-Object -First 20) -join ', ')))</div>")
+	                }
+	                if ($integrations.Count -gt 0) {
+	                    [void]$html.AppendLine("<div><b>Integrations</b></div><div>$((Encode-Html (($integrations | Select-Object -First 20) -join ', ')))</div>")
+	                }
+	                if ($queues.Count -gt 0) {
+	                    [void]$html.AppendLine("<div><b>Queues</b></div><div>$((Encode-Html (($queues | Select-Object -First 20) -join ', ')))</div>")
+	                }
+	                if ($flows.Count -gt 0) {
+	                    [void]$html.AppendLine("<div><b>Flows</b></div><div>$((Encode-Html (($flows | Select-Object -First 20) -join ', ')))</div>")
+	                }
+	                [void]$html.AppendLine("</div></div>")
+	            }
+	        }
+
         if (-not [string]::IsNullOrWhiteSpace($notes)) {
-            [void]$html.AppendLine("<div style='margin-top:6px'><b>Notes:</b> $($encode($notes))</div>")
+            [void]$html.AppendLine("<div style='margin-top:6px'><b>Notes:</b> $((Encode-Html $notes))</div>")
         }
         [void]$html.AppendLine("</div>")
     }
@@ -109,7 +172,7 @@ th { background: #fafafa; }
         foreach ($k in ($keys | Sort-Object)) {
             $cur = $currentParams.$k
             $base = $baselineParams.$k
-            [void]$html.AppendLine("<tr><td><b>$($encode($k))</b></td><td><pre>$($encode(To-PrettyString $cur))</pre></td><td><pre>$($encode(To-PrettyString $base))</pre></td></tr>")
+            [void]$html.AppendLine("<tr><td><b>$((Encode-Html $k))</b></td><td><pre>$((Encode-Html (To-PrettyString $cur)))</pre></td><td><pre>$((Encode-Html (To-PrettyString $base)))</pre></td></tr>")
         }
         [void]$html.AppendLine("</tbody></table>")
     }
@@ -120,10 +183,10 @@ th { background: #fafafa; }
             $v = $prop.Value
             $text = To-PrettyString $v
             if ($text -match '^[\\[{]') {
-                [void]$html.AppendLine("<div><b>$($encode($k))</b></div><div><pre>$($encode($text))</pre></div>")
+                [void]$html.AppendLine("<div><b>$((Encode-Html $k))</b></div><div><pre>$((Encode-Html $text))</pre></div>")
             }
             else {
-                [void]$html.AppendLine("<div><b>$($encode($k))</b></div><div>$($encode($text))</div>")
+                [void]$html.AppendLine("<div><b>$((Encode-Html $k))</b></div><div>$((Encode-Html $text))</div>")
             }
         }
         [void]$html.AppendLine("</div>")
@@ -155,7 +218,7 @@ th { background: #fafafa; }
                     elseif ([double]$cmp.Delta -lt 0) { $cls = "delta-neg" }
                 }
             } catch {}
-            [void]$html.AppendLine("<tr><td>$($encode($title))</td><td>$($encode($baseValue))</td><td>$($encode($curValue))</td><td class='$cls'>$($encode($delta))</td><td>$($encode($pct))</td></tr>")
+            [void]$html.AppendLine("<tr><td>$((Encode-Html $title))</td><td>$((Encode-Html $baseValue))</td><td>$((Encode-Html $curValue))</td><td class='$cls'>$((Encode-Html $delta))</td><td>$((Encode-Html $pct))</td></tr>")
         }
         [void]$html.AppendLine("</tbody></table></div>")
     }
@@ -168,9 +231,9 @@ th { background: #fafafa; }
         foreach ($m in $metrics) {
             $title = [string]$m.title
             $value = [string]$m.value
-            [void]$html.AppendLine("<h3>$($encode($title))</h3>")
+            [void]$html.AppendLine("<h3>$((Encode-Html $title))</h3>")
             if ($value) {
-                [void]$html.AppendLine("<div><b>Value:</b> $($encode($value))</div>")
+                [void]$html.AppendLine("<div><b>Value:</b> $((Encode-Html $value))</div>")
             }
 
             if ($m.PSObject.Properties.Name -contains 'items' -and $null -ne $m.items) {
@@ -179,14 +242,14 @@ th { background: #fafafa; }
                     $cols = @($items[0].PSObject.Properties.Name)
                     [void]$html.AppendLine("<table><thead><tr>")
                     foreach ($c in $cols) {
-                        [void]$html.AppendLine("<th>$($encode($c))</th>")
+                        [void]$html.AppendLine("<th>$((Encode-Html $c))</th>")
                     }
                     [void]$html.AppendLine("</tr></thead><tbody>")
                     foreach ($row in $items) {
                         [void]$html.AppendLine("<tr>")
                         foreach ($c in $cols) {
                             $cell = $row.PSObject.Properties[$c].Value
-                            [void]$html.AppendLine("<td>$($encode([string]$cell))</td>")
+                            [void]$html.AppendLine("<td>$((Encode-Html $cell))</td>")
                         }
                         [void]$html.AppendLine("</tr>")
                     }
@@ -203,7 +266,7 @@ th { background: #fafafa; }
         foreach ($d in $drilldowns) {
             $title = if ($d.PSObject.Properties.Name -contains 'title') { [string]$d.title } else { 'drilldown' }
             $items = if ($d.PSObject.Properties.Name -contains 'items') { @($d.items) } else { @() }
-            [void]$html.AppendLine("<h3>$($encode($title))</h3>")
+            [void]$html.AppendLine("<h3>$((Encode-Html $title))</h3>")
             if ($items.Count -eq 0) {
                 [void]$html.AppendLine("<div>(No rows.)</div>")
                 continue
@@ -212,13 +275,13 @@ th { background: #fafafa; }
             $cols = @($items[0].PSObject.Properties.Name)
             if ($cols.Count -gt 0) {
                 [void]$html.AppendLine("<table><thead><tr>")
-                foreach ($c in $cols) { [void]$html.AppendLine("<th>$($encode($c))</th>") }
+                foreach ($c in $cols) { [void]$html.AppendLine("<th>$((Encode-Html $c))</th>") }
                 [void]$html.AppendLine("</tr></thead><tbody>")
                 foreach ($row in $items | Select-Object -First 200) {
                     [void]$html.AppendLine("<tr>")
                     foreach ($c in $cols) {
                         $cell = $row.PSObject.Properties[$c].Value
-                        [void]$html.AppendLine("<td>$($encode(To-PrettyString $cell))</td>")
+                        [void]$html.AppendLine("<td>$((Encode-Html (To-PrettyString $cell)))</td>")
                     }
                     [void]$html.AppendLine("</tr>")
                 }
