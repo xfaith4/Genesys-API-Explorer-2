@@ -8,7 +8,7 @@ $baseUrl = "https://api.$region"
 $path = "/api/v2/analytics/conversations/details/query"
 $headers = @{
     "Authorization" = "Bearer $token"
-    "Content-Type" = "application/json"
+    "Content-Type"  = "application/json"
 }
 $url = "$baseUrl$path"
 
@@ -16,6 +16,7 @@ try {
     $response = Invoke-WebRequest -Uri $url -Method post -Headers $headers
     Write-Host "Success: $($response.StatusCode)"
     $response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
-} catch {
+}
+catch {
     Write-Error "Request failed: $($_.Exception.Message)"
 }

@@ -12,6 +12,6 @@ This is the “ready for Phase 2” bar for the Insight Packs engine + Ops Conso
 
 ## Known gaps (Phase 2)
 
-- Blast radius for **Architect flows** (dependence graph: flows ↔ data actions/integrations/queues).
+- Full dependency graph (“why” correlation): flows ↔ data actions ↔ integrations ↔ queues (beyond the pack-level blast radius lists).
 - Broader “answers-first” pack coverage (flow regression, API usage/limits, change correlation).
 - Resilience enhancements (rate-limit manager, retry/backoff policy tuning, concurrency controls).

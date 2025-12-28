@@ -28,7 +28,7 @@ param(
 )
 
 # Quick sanity checks so we fail early instead of silently doing nothing.
-foreach ($fn in 'Get-GCQueueSmokeReport','Get-GCQueueHotConversations') {
+foreach ($fn in 'Get-GCQueueSmokeReport', 'Get-GCQueueHotConversations') {
     if (-not (Get-Command -Name $fn -ErrorAction SilentlyContinue)) {
         throw "Required function '$fn' is not available. Import your Genesys toolbox module first."
     }
@@ -64,7 +64,7 @@ if (-not $queueView) {
     return
 }
 
-$selectedQueueId   = $queueView.QueueId
+$selectedQueueId = $queueView.QueueId
 $selectedQueueName = $queueView.QueueName
 
 Write-Host "Selected queue: $selectedQueueName [$selectedQueueId]" -ForegroundColor Yellow

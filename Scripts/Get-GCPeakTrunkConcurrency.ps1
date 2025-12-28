@@ -104,7 +104,7 @@ function Ceil-ToMinuteUtc {
 function Invoke-GcApi {
   [CmdletBinding()]
   param(
-    [Parameter(Mandatory)][ValidateSet('GET','POST')]
+    [Parameter(Mandatory)][ValidateSet('GET', 'POST')]
     [string]$Method,
 
     [Parameter(Mandatory)]
@@ -118,8 +118,8 @@ function Invoke-GcApi {
   $uri = "$($BaseUri)$($Path)"
   if ($Query -and $Query.Count -gt 0) {
     $qs = ($Query.GetEnumerator() | ForEach-Object {
-      "$([uri]::EscapeDataString($_.Key))=$([uri]::EscapeDataString([string]$_.Value))"
-    }) -join '&'
+        "$([uri]::EscapeDataString($_.Key))=$([uri]::EscapeDataString([string]$_.Value))"
+      }) -join '&'
     $uri = "$($uri)?$($qs)"
   }
 
@@ -137,19 +137,20 @@ function Invoke-GcApi {
           $json = ($Body | ConvertTo-Json -Depth 50 -Compress)
         }
         $resp = Invoke-RestMethod -Method POST -Uri $uri -Headers $headers -ContentType 'application/json' -Body $json -ResponseHeadersVariable rh
-      } else {
+      }
+      else {
         $resp = Invoke-RestMethod -Method GET -Uri $uri -Headers $headers -ResponseHeadersVariable rh
       }
 
       # Rate limit soft-throttle (Genesys headers: inin-ratelimit-allowed/count/reset)
       $allowed = $null
-      $count   = $null
-      $reset   = $null
+      $count = $null
+      $reset = $null
 
       if ($rh) {
         $allowed = $rh['inin-ratelimit-allowed'] | Select-Object -First 1
-        $count   = $rh['inin-ratelimit-count']   | Select-Object -First 1
-        $reset   = $rh['inin-ratelimit-reset']   | Select-Object -First 1
+        $count = $rh['inin-ratelimit-count']   | Select-Object -First 1
+        $reset = $rh['inin-ratelimit-reset']   | Select-Object -First 1
       }
 
       if ($allowed -and $count) {
@@ -172,11 +173,13 @@ function Invoke-GcApi {
       if ($ex.Response) {
         try {
           $statusCode = [int]$ex.Response.StatusCode
-        } catch {}
+        }
+        catch {}
 
         try {
           $retryAfter = $ex.Response.Headers['Retry-After']
-        } catch {}
+        }
+        catch {}
       }
 
       # 429: too many requests -> obey Retry-After if present, else short backoff
@@ -221,7 +224,7 @@ if ($IntervalEndUtc -le $IntervalStartUtc) {
 }
 
 $monthStart = [datetime]::SpecifyKind($IntervalStartUtc, [System.DateTimeKind]::Utc)
-$monthEnd   = [datetime]::SpecifyKind($IntervalEndUtc,   [System.DateTimeKind]::Utc)
+$monthEnd = [datetime]::SpecifyKind($IntervalEndUtc, [System.DateTimeKind]::Utc)
 
 $totalMinutes = [int][math]::Ceiling(($monthEnd - $monthStart).TotalMinutes)
 # diff array length is totalMinutes + 1 so we can safely decrement at endExclusiveIndex == totalMinutes
@@ -247,12 +250,12 @@ while ($chunkStart -lt $monthEnd) {
 
   # Build async conversation details job query (filter to voice via segmentFilters)
   $jobBody = @{
-    interval    = $intervalStr
-    order       = 'asc'
-    orderBy     = 'conversationStart'
+    interval       = $intervalStr
+    order          = 'asc'
+    orderBy        = 'conversationStart'
     segmentFilters = @(
       @{
-        type = 'and'
+        type       = 'and'
         predicates = @(
           @{ type = 'dimension'; dimension = 'mediaType'; value = 'voice' }
         )
@@ -320,7 +323,7 @@ while ($chunkStart -lt $monthEnd) {
 
           # ---- External trunk root-leg filter (purpose-agnostic) ----
           if ($s.mediaType -ne 'voice') { continue }
-          if (-not ($s.ani  -is [string] -and $s.ani  -like 'tel:*')) { continue }
+          if (-not ($s.ani -is [string] -and $s.ani -like 'tel:*')) { continue }
           if (-not ($s.dnis -is [string] -and $s.dnis -like 'tel:*')) { continue }
 
           # Root-leg heuristic: peerId must be missing/empty
@@ -348,7 +351,7 @@ while ($chunkStart -lt $monthEnd) {
 
           # ---- Compute interval excluding wrapup ----
           $startUtc = $null
-          $endUtc   = $null
+          $endUtc = $null
 
           $segments = @()
           if ($s.segments) { $segments = @($s.segments) }
@@ -363,7 +366,8 @@ while ($chunkStart -lt $monthEnd) {
             $wrap = $segmentsSorted | Where-Object { $_.segmentType -eq 'wrapup' } | Select-Object -First 1
             if ($wrap) {
               $endUtc = Parse-GcUtc -Value $wrap.segmentStart
-            } else {
+            }
+            else {
               $maxEnd = $null
               foreach ($seg in $segmentsSorted) {
                 if ($seg.segmentEnd) {
@@ -394,7 +398,7 @@ while ($chunkStart -lt $monthEnd) {
           # Minute bucket math: count if interval intersects the minute bucket.
           # Use [startFloor, endCeil) in minutes.
           $startBucket = Floor-ToMinuteUtc -Utc $startUtc
-          $endBucketEx = Ceil-ToMinuteUtc  -Utc $endUtc
+          $endBucketEx = Ceil-ToMinuteUtc -Utc $endUtc
 
           if ($endBucketEx -le $startBucket) { continue }
 

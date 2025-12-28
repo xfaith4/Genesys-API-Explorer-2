@@ -39,13 +39,13 @@ function Invoke-WithRetry {
             return & $ScriptBlock
         }
         catch {
-            $errorMessage    = $_.Exception.Message
+            $errorMessage = $_.Exception.Message
             $responseContent = $null
 
             # Attempt to extract the Response body if available (for Invoke-RestMethod/WebException)
             if ($_.Exception.PSObject.Properties['Response']) {
                 try {
-                    $reader          = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                    $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
                     $responseContent = $reader.ReadToEnd()
                     $reader.Close()
                 }
@@ -53,7 +53,7 @@ function Invoke-WithRetry {
             }
 
             # If we have a JSON response, try to parse it for the message
-            $retryDelay    = $DelaySeconds
+            $retryDelay = $DelaySeconds
             $parsedMessage = $errorMessage
 
             if ($responseContent) {
@@ -99,8 +99,8 @@ function Invoke-WithRetry {
 ### BEGIN: Get-DateInterval
 function Get-DateInterval {
     $startDate = (Get-Date).AddDays(-1).ToString("yyyy-MM-dd") + 'T04:00:00.000Z'
-    $endDate   = (Get-Date).ToString("yyyy-MM-dd") + 'T04:00:00.000Z'
-    $interval  = "$startDate" + "/" + "$endDate"
+    $endDate = (Get-Date).ToString("yyyy-MM-dd") + 'T04:00:00.000Z'
+    $interval = "$startDate" + "/" + "$endDate"
     return $interval
 }
 ### END: Get-DateInterval
@@ -156,9 +156,9 @@ function Write-Log {
         }
     }
 
-    $LogFile    = Join-Path -Path $LogDirectory -ChildPath "$ScriptName.log"
-    $timeStamp  = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logEntry   = "$timeStamp [$Level] $Message"
+    $LogFile = Join-Path -Path $LogDirectory -ChildPath "$ScriptName.log"
+    $timeStamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logEntry = "$timeStamp [$Level] $Message"
 
     # Implement log rotation (e.g., rotate if file exceeds 5MB)
     $maxSize = 5MB
@@ -219,9 +219,9 @@ function Invoke-GenesysCloudAPI {
     )
 
     try {
-        $ScriptName       = $MyInvocation.MyCommand.Name
-        $Global:results   = New-Object System.Collections.Generic.List[object]
-        $Global:response  = @{}
+        $ScriptName = $MyInvocation.MyCommand.Name
+        $Global:results = New-Object System.Collections.Generic.List[object]
+        $Global:response = @{}
 
         if (-not $Headers) {
             $Headers = @{}
@@ -236,12 +236,12 @@ function Invoke-GenesysCloudAPI {
         # Handle endpoints that include the literal '$ID' placeholder
         if ($endpoint -like '*$ID*') {
             # Replace the $ID placeholder with the provided ID value
-            $endpoint    = $endpoint.Replace('$ID', $ID)
-            $uri         = "$baseUrl$endpoint"
-            $internalID  = $true
+            $endpoint = $endpoint.Replace('$ID', $ID)
+            $uri = "$baseUrl$endpoint"
+            $internalID = $true
         }
         else {
-            $uri        = "$baseUrl$endpoint"
+            $uri = "$baseUrl$endpoint"
             $internalID = $false
         }
 
@@ -250,7 +250,7 @@ function Invoke-GenesysCloudAPI {
 
         # Cursor-based pagination for fulfilled jobs
         if ($jobId -and ($state -eq "FULFILLED")) {
-            $cursor    = $null
+            $cursor = $null
             $pageCount = 1
 
             # Delete job if requested
@@ -351,7 +351,7 @@ function Invoke-GenesysCloudAPI {
         # Handle endpoints that use {conversationId}
         if ($endpoint -match '{conversationId}' -and $ID) {
             $endpoint = $endpoint.Replace('{conversationId}', $ID)
-            $uri      = "$baseUrl$endpoint"
+            $uri = "$baseUrl$endpoint"
         }
 
         # Send initial request
@@ -380,8 +380,8 @@ function Invoke-GenesysCloudAPI {
         if ($response.conversations) { $results.AddRange($response.conversations) }
 
         # Set cursor/page-based pagination
-        $nextPage  = $response.nextPage
-        $nextUri   = $response.nextUri
+        $nextPage = $response.nextPage
+        $nextUri = $response.nextUri
         $pageCount = $response.pageCount
 
         Write-Host "PageCount: $($pageCount)"
@@ -436,8 +436,8 @@ function Invoke-GenesysCloudAPI {
                 if ($response.results) { $results.AddRange($response.results) }
                 if ($response.conversations) { $results.AddRange($response.conversations) }
 
-                $nextPage   = $response.nextPage
-                $nextUri    = $response.nextUri
+                $nextPage = $response.nextPage
+                $nextUri = $response.nextUri
                 $pageNumber = $response.pageNumber
 
                 if ($pageNumber -ge $pageCount) {

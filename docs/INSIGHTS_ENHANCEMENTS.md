@@ -26,7 +26,7 @@ This is a working checklist for making Insight Packs more powerful and the resul
 
 - [x] Evidence model: `severity`, `impact`, `likelyCauses`, `recommendedActions`, and “why this matters” narrative.
 - [x] Baselines: compare the selected window vs prior window (or 7/30 day baseline) and highlight deltas.
-- [ ] “Blast radius” enrichment: link failures to affected integrations/flows/queues where possible (Data Actions pack includes Integrations/Actions; Queue Smoke pack includes Queues; flows TBD).
+- [x] “Blast radius” enrichment: link failures to affected integrations/flows/queues where possible (Data Actions pack includes Integrations/Actions/Flows; Queue Smoke pack includes Queues).
 
 ## Discoverability & governance
 

@@ -16,48 +16,56 @@ Complete reference of all 31 pre-configured templates in the Genesys Cloud API E
 All GET templates for retrieving conversation data and recordings.
 
 ### 1. Get Active Conversations
+
 - **Method**: GET
 - **Path**: `/api/v2/conversations`
 - **Parameters**: None
 - **Description**: Retrieve all active conversations for the logged-in user
 
 ### 2. Get Specific Conversation Details
+
 - **Method**: GET
 - **Path**: `/api/v2/conversations/{conversationId}`
 - **Parameters**: `conversationId`
 - **Description**: Fetch complete details for a single conversation
 
 ### 3. Get Conversation Recording Metadata
+
 - **Method**: GET
 - **Path**: `/api/v2/conversations/{conversationId}/recordingmetadata`
 - **Parameters**: `conversationId`
 - **Description**: Get recording metadata for a conversation (no playable media)
 
 ### 4. Get Call History
+
 - **Method**: GET
 - **Path**: `/api/v2/conversations/calls/history`
 - **Parameters**: `pageSize`, `pageNumber`
 - **Description**: Retrieve call history with pagination
 
 ### 5. Get Active Callbacks
+
 - **Method**: GET
 - **Path**: `/api/v2/conversations/callbacks`
 - **Parameters**: None
 - **Description**: List all currently active callbacks
 
 ### 6. Get Active Calls
+
 - **Method**: GET
 - **Path**: `/api/v2/conversations/calls`
 - **Parameters**: None
 - **Description**: List all currently active calls
 
 ### 7. Get Active Chats
+
 - **Method**: GET
 - **Path**: `/api/v2/conversations/chats`
 - **Parameters**: None
 - **Description**: List all currently active chat conversations
 
 ### 8. Get Active Emails
+
 - **Method**: GET
 - **Path**: `/api/v2/conversations/emails`
 - **Parameters**: None
@@ -72,30 +80,35 @@ All GET templates for retrieving conversation data and recordings.
 ### GET Templates
 
 #### 9. Get Multiple Conversations by IDs
+
 - **Method**: GET
 - **Path**: `/api/v2/analytics/conversations/details`
 - **Parameters**: `id` (comma-separated)
 - **Description**: Batch retrieval of multiple conversations
 
 #### 10. Get Single Conversation Analytics
+
 - **Method**: GET
 - **Path**: `/api/v2/analytics/conversations/{conversationId}/details`
 - **Parameters**: `conversationId`
 - **Description**: Get detailed analytics for one conversation
 
 #### 11. Get Conversation Details Job Status
+
 - **Method**: GET
 - **Path**: `/api/v2/analytics/conversations/details/jobs/{jobId}`
 - **Parameters**: `jobId`
 - **Description**: Check the status of an async conversation query job
 
 #### 12. Get Conversation Details Job Results
+
 - **Method**: GET
 - **Path**: `/api/v2/analytics/conversations/details/jobs/{jobId}/results`
 - **Parameters**: `jobId`, `pageSize`
 - **Description**: Retrieve results from a completed async job
 
 #### 13. Get User Details Job Status
+
 - **Method**: GET
 - **Path**: `/api/v2/analytics/users/details/jobs/{jobId}`
 - **Parameters**: `jobId`
@@ -104,54 +117,63 @@ All GET templates for retrieving conversation data and recordings.
 ### POST Templates
 
 #### 14. Query Conversation Details - Last 7 Days
+
 - **Method**: POST
 - **Path**: `/api/v2/analytics/conversations/details/query`
 - **Parameters**: `body` (JSON with interval, paging, filters)
 - **Description**: Fetch detailed conversation data for the past week
 
 #### 15. Query Conversation Details - Today
+
 - **Method**: POST
 - **Path**: `/api/v2/analytics/conversations/details/query`
 - **Parameters**: `body` (JSON with interval, paging, filters)
 - **Description**: Get today's conversation details with recent-first ordering
 
 #### 16. Query Conversation Details - By Queue
+
 - **Method**: POST
 - **Path**: `/api/v2/analytics/conversations/details/query`
 - **Parameters**: `body` (JSON with queue filter)
 - **Description**: Filter conversations by specific queue ID
 
 #### 17. Query Conversation Details - By Media Type
+
 - **Method**: POST
 - **Path**: `/api/v2/analytics/conversations/details/query`
 - **Parameters**: `body` (JSON with media type filter)
 - **Description**: Filter conversations by media type (voice, chat, email, etc.)
 
 #### 18. Query Conversation Aggregates - Daily Stats
+
 - **Method**: POST
 - **Path**: `/api/v2/analytics/conversations/aggregates/query`
 - **Parameters**: `body` (JSON with interval, groupBy, metrics)
 - **Description**: Get aggregated metrics by hour and queue
 
 #### 19. Query Conversation Aggregates - Agent Performance
+
 - **Method**: POST
 - **Path**: `/api/v2/analytics/conversations/aggregates/query`
 - **Parameters**: `body` (JSON with groupBy userId, metrics)
 - **Description**: Analyze agent performance metrics by user
 
 #### 20. Query Conversation Transcripts
+
 - **Method**: POST
 - **Path**: `/api/v2/analytics/conversations/transcripts/query`
 - **Parameters**: `body` (JSON with conversation filters)
 - **Description**: Retrieve conversation transcripts for analysis
 
 #### 21. Create Conversation Details Job - Large Query
+
 - **Method**: POST
 - **Path**: `/api/v2/analytics/conversations/details/jobs`
 - **Parameters**: `body` (JSON with interval, filters)
 - **Description**: Initiate an async job for large data queries
 
 #### 22. Query Conversation Activity
+
 - **Method**: POST
 - **Path**: `/api/v2/analytics/conversations/activity/query`
 - **Parameters**: `body` (JSON with interval, filter, metrics)
@@ -164,12 +186,14 @@ All GET templates for retrieving conversation data and recordings.
 All GET templates for speech analytics and sentiment analysis.
 
 ### 23. Get Speech and Text Analytics for Conversation
+
 - **Method**: GET
 - **Path**: `/api/v2/speechandtextanalytics/conversations/{conversationId}`
 - **Parameters**: `conversationId`
 - **Description**: Get comprehensive speech analytics for a conversation
 
 ### 24. Get Sentiment Data for Conversation
+
 - **Method**: GET
 - **Path**: `/api/v2/speechandtextanalytics/conversations/{conversationId}/sentiments`
 - **Parameters**: `conversationId`
@@ -182,6 +206,7 @@ All GET templates for speech analytics and sentiment analysis.
 GET template for telephony troubleshooting.
 
 ### 25. Get SIP Message for Conversation
+
 - **Method**: GET
 - **Path**: `/api/v2/telephony/sipmessages/conversations/{conversationId}`
 - **Parameters**: `conversationId`
@@ -194,12 +219,14 @@ GET template for telephony troubleshooting.
 All GET templates for routing and queue management.
 
 ### 26. Get Queue Details
+
 - **Method**: GET
 - **Path**: `/api/v2/routing/queues/{queueId}`
 - **Parameters**: `queueId`
 - **Description**: Get detailed information about a specific queue
 
 ### 27. Get Queue Members
+
 - **Method**: GET
 - **Path**: `/api/v2/routing/queues/{queueId}/members`
 - **Parameters**: `queueId`
@@ -212,24 +239,28 @@ All GET templates for routing and queue management.
 All GET templates for user routing, skills, and presence.
 
 ### 28. Get User Routing Skills
+
 - **Method**: GET
 - **Path**: `/api/v2/users/{userId}/routingskills`
 - **Parameters**: `userId`
 - **Description**: List routing skills assigned to a user
 
 ### 29. Get User Presence (Genesys Cloud)
+
 - **Method**: GET
 - **Path**: `/api/v2/users/{userId}/presences/purecloud`
 - **Parameters**: `userId`
 - **Description**: Get a user's Genesys Cloud presence status
 
 ### 30. Get Bulk User Presences (Genesys Cloud)
+
 - **Method**: GET
 - **Path**: `/api/v2/users/presences/purecloud/bulk`
 - **Parameters**: `id` (comma-separated user IDs)
 - **Description**: Get presence status for multiple users at once
 
 ### 31. Get User Routing Status
+
 - **Method**: GET
 - **Path**: `/api/v2/users/{userId}/routingstatus`
 - **Parameters**: `userId`
@@ -264,6 +295,7 @@ Some templates accept multiple IDs:
 ## Template Categories by Use Case
 
 ### Real-Time Monitoring
+
 - Get Active Conversations
 - Get Active Callbacks/Calls/Chats/Emails
 - Get User Presence
@@ -271,28 +303,33 @@ Some templates accept multiple IDs:
 - Get User Routing Status
 
 ### Historical Analysis
+
 - Get Call History
 - Query Conversation Details (all variants)
 - Query Conversation Aggregates
 - Query Conversation Activity
 
 ### Deep Analysis
+
 - Get Single Conversation Analytics
 - Get Speech and Text Analytics
 - Get Sentiment Data
 - Query Conversation Transcripts
 
 ### Troubleshooting
+
 - Get SIP Message for Conversation
 - Get Conversation Recording Metadata
 - Get Speech and Text Analytics
 
 ### Configuration & Staffing
+
 - Get Queue Details
 - Get Queue Members
 - Get User Routing Skills
 
 ### Bulk Operations
+
 - Create Conversation Details Job
 - Get Conversation Details Job Status/Results
 - Get User Details Job Status

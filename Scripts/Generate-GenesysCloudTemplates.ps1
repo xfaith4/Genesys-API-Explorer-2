@@ -2,19 +2,19 @@
 [CmdletBinding()]
 param(
     # The JSON you just extracted from the zip
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$EndpointJsonPath,
 
     # Your existing curated templates (the JSON you pasted in the first message)
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$ExistingTemplatePath = ".\GenesysApiTemplates.json",
 
     # Where to write the combined output
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$OutputPath = ".\GenesysApiTemplates.generated.json",
 
     # Limit which paths we convert into templates
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string[]]$IncludePathPrefix = @(
         "/api/v2/conversations",
         "/api/v2/analytics",
@@ -22,7 +22,7 @@ param(
     ),
 
     # Optional: further limit by OpenAPI tags (e.g. "Conversations")
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string[]]$IncludeTag = @()
 )
 
@@ -51,7 +51,7 @@ if (-not $spec.paths) {
 # Load existing templates so we can append auto-generated ones
 $existingTemplates = @()
 if ($ExistingTemplatePath -and (Test-Path -LiteralPath $ExistingTemplatePath)) {
-    $existingJson      = Get-Content -LiteralPath $ExistingTemplatePath -Raw
+    $existingJson = Get-Content -LiteralPath $ExistingTemplatePath -Raw
     $existingTemplates = $existingJson | ConvertFrom-Json
 }
 
@@ -69,10 +69,10 @@ $now = Get-Date
 # ---------------------------
 function Test-IncludePath {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$Path,
 
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string[]]$Prefixes
     )
 
@@ -114,7 +114,7 @@ foreach ($pathProp in $paths.PSObject.Properties) {
         $method = $methodProp.Name.ToUpperInvariant()
 
         # Only process real HTTP verbs
-        if ($method -notin @('GET','POST','PUT','DELETE','PATCH')) {
+        if ($method -notin @('GET', 'POST', 'PUT', 'DELETE', 'PATCH')) {
             continue
         }
 
@@ -129,7 +129,7 @@ foreach ($pathProp in $paths.PSObject.Properties) {
         }
 
         # Build Parameters: path params + body (if any)
-        $paramObj  = [ordered]@{}
+        $paramObj = [ordered]@{}
         $allParams = @()
 
         # Path-level parameters
@@ -183,7 +183,7 @@ foreach ($pathProp in $paths.PSObject.Properties) {
         }
 
         # For write verbs, attach the body if we could infer one
-        if ($bodyJson -and $method -in @('POST','PUT','PATCH')) {
+        if ($bodyJson -and $method -in @('POST', 'PUT', 'PATCH')) {
             # Store as raw JSON string so your GUI can show/edit it
             $paramObj['body'] = $bodyJson
         }
@@ -228,7 +228,7 @@ foreach ($pathProp in $paths.PSObject.Properties) {
 }
 
 $templateCountAfter = $allTemplates.Count
-$templateDelta      = $templateCountAfter - $templateCountBefore
+$templateDelta = $templateCountAfter - $templateCountBefore
 
 Write-Host "Paths inspected      : $($pathCount)"
 Write-Host "Existing templates   : $($templateCountBefore)"

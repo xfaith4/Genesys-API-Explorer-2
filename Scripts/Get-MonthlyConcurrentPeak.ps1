@@ -86,7 +86,7 @@ param(
     [string]$TimeZoneId = 'Eastern Standard Time',
 
     [int]$BusinessStartHourLocal = 8,
-    [int]$BusinessEndHourLocal   = 17,
+    [int]$BusinessEndHourLocal = 17,
 
     [string]$OutputCsvPath = '.\PeakConcurrentByDivision.csv',
 
@@ -106,16 +106,16 @@ param(
 # -----------------------------
 if (-not $MonthEnd) {
     # First day of current month (local)
-    $now        = Get-Date
-    $MonthEnd   = Get-Date -Year $now.Year -Month $now.Month -Day 1 `
-                           -Hour 0 -Minute 0 -Second 0 -Millisecond 0
+    $now = Get-Date
+    $MonthEnd = Get-Date -Year $now.Year -Month $now.Month -Day 1 `
+        -Hour 0 -Minute 0 -Second 0 -Millisecond 0
 }
 
 if (-not $MonthStart) {
     # First day of previous month (local)
     $prevMonth = $MonthEnd.AddMonths(-1)
     $MonthStart = Get-Date -Year $prevMonth.Year -Month $prevMonth.Month -Day 1 `
-                            -Hour 0 -Minute 0 -Second 0 -Millisecond 0
+        -Hour 0 -Minute 0 -Second 0 -Millisecond 0
 }
 
 if ($MonthEnd -le $MonthStart) {
@@ -128,8 +128,8 @@ Write-Verbose "Reporting window (local): $($MonthStart) -> $($MonthEnd)"
 # Shared script-scope state
 # -----------------------------
 # Script-scoped token cache so repeated calls don't re-auth unless expired.
-$script:GcAccessToken      = $null
-$script:GcTokenExpiryUtc   = Get-Date 0
+$script:GcAccessToken = $null
+$script:GcTokenExpiryUtc = Get-Date 0
 
 # Build base API URI from environment.
 # Example: usw2.pure.cloud -> https://api.usw2.pure.cloud
@@ -149,8 +149,8 @@ function Get-GCAccessToken {
     $tokenUri = "$($script:GcBaseUri)/oauth/token"
 
     # Prepare basic auth header: base64("clientId:clientSecret")
-    $pairBytes   = [System.Text.Encoding]::UTF8.GetBytes("$ClientId`:$ClientSecret")
-    $basicToken  = [Convert]::ToBase64String($pairBytes)
+    $pairBytes = [System.Text.Encoding]::UTF8.GetBytes("$ClientId`:$ClientSecret")
+    $basicToken = [Convert]::ToBase64String($pairBytes)
 
     $headers = @{
         Authorization = "Basic $basicToken"
@@ -164,7 +164,7 @@ function Get-GCAccessToken {
 
     try {
         $response = Invoke-RestMethod -Method Post -Uri $tokenUri `
-                                      -Headers $headers -Body $body
+            -Headers $headers -Body $body
     }
     catch {
         throw "OAuth token request failed against $($tokenUri): $($_)"
@@ -177,7 +177,7 @@ function Get-GCAccessToken {
     $script:GcAccessToken = $response.access_token
 
     # expires_in is seconds from now.
-    $expiresInSeconds     = [int]($response.expires_in)
+    $expiresInSeconds = [int]($response.expires_in)
     # Renew a minute early just to be safe.
     $script:GcTokenExpiryUtc = (Get-Date).ToUniversalTime().AddSeconds($expiresInSeconds - 60)
 
@@ -211,17 +211,17 @@ function Invoke-GCRequest {
         $uriBuilder.Query = ($pairs -join '&')
     }
 
-    $uri     = $uriBuilder.Uri.AbsoluteUri
-    $token   = Get-GCAccessToken
+    $uri = $uriBuilder.Uri.AbsoluteUri
+    $token = Get-GCAccessToken
 
     $headers = @{
-        Authorization = "Bearer $token"
+        Authorization  = "Bearer $token"
         'Content-Type' = 'application/json'
     }
 
     $invokeParams = @{
-        Method  = $Method
-        Uri     = $uri
+        Method  = $Method
+        Uri     = $uri
         Headers = $headers
     }
 
@@ -256,22 +256,22 @@ function Start-GCConversationDetailsJob {
     # - Filter to voice mediaType via segmentFilters
     # - Order by conversationStart ascending
     $body = @{
-        interval        = $interval
-        order           = 'asc'
-        orderBy         = 'conversationStart'
-        paging          = @{
-            pageSize   = 100
+        interval       = $interval
+        order          = 'asc'
+        orderBy        = 'conversationStart'
+        paging         = @{
+            pageSize   = 100
             pageNumber = 1
         }
-        segmentFilters  = @(
+        segmentFilters = @(
             @{
-                type       = 'and'
+                type       = 'and'
                 predicates = @(
                     @{
-                        type      = 'dimension'
+                        type      = 'dimension'
                         dimension = 'mediaType'
-                        operator  = 'matches'
-                        value     = 'voice'
+                        operator  = 'matches'
+                        value     = 'voice'
                     }
                 )
             }
@@ -279,8 +279,8 @@ function Start-GCConversationDetailsJob {
     }
 
     $response = Invoke-GCRequest -Method 'POST' `
-                                 -Path '/api/v2/analytics/conversations/details/jobs' `
-                                 -Body $body
+        -Path '/api/v2/analytics/conversations/details/jobs' `
+        -Body $body
 
     if (-not $response.id) {
         throw "Conversation details job did not return an id. Raw: $($response | ConvertTo-Json -Depth 6)"
@@ -297,14 +297,14 @@ function Wait-GCConversationDetailsJob {
     param(
         [Parameter(Mandatory = $true)][string]$JobId,
         [int]$PollSeconds = 10,
-        [int]$MaxMinutes  = 60
+        [int]$MaxMinutes = 60
     )
 
     $deadline = (Get-Date).AddMinutes($MaxMinutes)
 
     while ($true) {
         $job = Invoke-GCRequest -Method 'GET' `
-                                -Path "/api/v2/analytics/conversations/details/jobs/$JobId"
+            -Path "/api/v2/analytics/conversations/details/jobs/$JobId"
 
         $state = [string]$job.state
         Write-Host "Job $($JobId) state: $($state)" -ForegroundColor Yellow
@@ -312,8 +312,8 @@ function Wait-GCConversationDetailsJob {
         switch -Regex ($state) {
             '^FULFILLED$' { return $job }
             '^COMPLETED$' { return $job } # In case older docs use COMPLETED
-            '^FAILED$'    { throw "Conversation details job $($JobId) FAILED. Raw: $($job | ConvertTo-Json -Depth 6)" }
-            default       { }
+            '^FAILED$' { throw "Conversation details job $($JobId) FAILED. Raw: $($job | ConvertTo-Json -Depth 6)" }
+            default { }
         }
 
         if ((Get-Date) -gt $deadline) {
@@ -336,8 +336,8 @@ function Get-GCConversationDetailsResults {
     # This is implemented as a PowerShell "generator" via Write-Output
     # so we don't have to hold all conversations in memory at once.
 
-    $cursor       = $null
-    $pageCounter  = 0
+    $cursor = $null
+    $pageCounter = 0
 
     while ($true) {
         $query = @{
@@ -349,8 +349,8 @@ function Get-GCConversationDetailsResults {
         }
 
         $response = Invoke-GCRequest -Method 'GET' `
-                                     -Path "/api/v2/analytics/conversations/details/jobs/$JobId/results" `
-                                     -Query $query
+            -Path "/api/v2/analytics/conversations/details/jobs/$JobId/results" `
+            -Query $query
 
         $pageCounter++
 
@@ -389,18 +389,18 @@ function Get-GCDivisionLookup {
     Write-Host "Fetching authorization divisions for name lookup..." -ForegroundColor Cyan
 
     $pageNumber = 1
-    $pageSize   = 100
-    $lookup     = @{}
+    $pageSize = 100
+    $lookup = @{}
 
     while ($true) {
         $query = @{
             pageNumber = $pageNumber
-            pageSize   = $pageSize
+            pageSize   = $pageSize
         }
 
         $resp = Invoke-GCRequest -Method 'GET' `
-                                 -Path '/api/v2/authorization/divisions' `
-                                 -Query $query
+            -Path '/api/v2/authorization/divisions' `
+            -Query $query
 
         $entities = $resp.entities
         if (-not $entities -or -not $entities.Count) {
@@ -453,7 +453,7 @@ function Get-GCPeakConcurrentByDivision {
 
     # Convert reporting window boundaries to UTC for Analytics job
     $startUtc = [System.TimeZoneInfo]::ConvertTimeToUtc($MonthStart, $tz)
-    $endUtc   = [System.TimeZoneInfo]::ConvertTimeToUtc($MonthEnd,   $tz)
+    $endUtc = [System.TimeZoneInfo]::ConvertTimeToUtc($MonthEnd, $tz)
 
     Write-Host "Analytics job interval (UTC): $($startUtc.ToString('o')) / $($endUtc.ToString('o'))" -ForegroundColor Cyan
 
@@ -470,7 +470,7 @@ function Get-GCPeakConcurrentByDivision {
     $divisionDeltas = @{}
 
     $businessStartSpan = [TimeSpan]::FromHours($BusinessStartHourLocal)
-    $businessEndSpan   = [TimeSpan]::FromHours($BusinessEndHourLocal)
+    $businessEndSpan = [TimeSpan]::FromHours($BusinessEndHourLocal)
 
     # Stream all conversations
     $convCount = 0
@@ -480,9 +480,9 @@ function Get-GCPeakConcurrentByDivision {
         $convCount++
 
         # Extract conversation-level fields; adjust if your org uses a different shape.
-        $convId          = $conv.conversationId
+        $convId = $conv.conversationId
         $conversationStartUtc = $conv.conversationStart
-        $conversationEndUtc   = $conv.conversationEnd
+        $conversationEndUtc = $conv.conversationEnd
 
         if (-not $conversationStartUtc -or -not $conversationEndUtc) {
             # Skip incomplete / in-flight calls for this historical report.
@@ -498,7 +498,7 @@ function Get-GCPeakConcurrentByDivision {
 
         # Convert start/end to local time
         $startLocal = [System.TimeZoneInfo]::ConvertTimeFromUtc([datetime]$conversationStartUtc, $tz)
-        $endLocal   = [System.TimeZoneInfo]::ConvertTimeFromUtc([datetime]$conversationEndUtc,   $tz)
+        $endLocal = [System.TimeZoneInfo]::ConvertTimeFromUtc([datetime]$conversationEndUtc, $tz)
 
         # Simple guard: ignore conversations entirely outside we care about.
         if ($endLocal -le $MonthStart -or $startLocal -ge $MonthEnd) {
@@ -520,11 +520,11 @@ function Get-GCPeakConcurrentByDivision {
 
         # Business-hours window for that day
         $businessDayStart = $startLocal.Date.Add($businessStartSpan)
-        $businessDayEnd   = $startLocal.Date.Add($businessEndSpan)
+        $businessDayEnd = $startLocal.Date.Add($businessEndSpan)
 
         # Clip to business hours
         $effectiveStart = if ($startLocal -lt $businessDayStart) { $businessDayStart } else { $startLocal }
-        $effectiveEnd   = if ($endLocal   -gt $businessDayEnd)   { $businessDayEnd   } else { $endLocal }
+        $effectiveEnd = if ($endLocal -gt $businessDayEnd) { $businessDayEnd } else { $endLocal }
 
         if ($effectiveEnd -le $effectiveStart) {
             # After clipping, nothing remains inside the window.
@@ -533,7 +533,7 @@ function Get-GCPeakConcurrentByDivision {
 
         # Floor to minute for start; derive exclusive end minute.
         $startSlot = Get-MinuteFloor -Timestamp $effectiveStart
-        $endSlot   = Get-MinuteFloor -Timestamp $effectiveEnd
+        $endSlot = Get-MinuteFloor -Timestamp $effectiveEnd
 
         # If end has any seconds > 0, bump to the next minute so the last partial minute counts.
         if ($effectiveEnd -gt $endSlot) {
@@ -576,12 +576,12 @@ function Get-GCPeakConcurrentByDivision {
         # Sort slots by actual DateTime (cast keys if they came back as strings)
         $sortedSlots = $deltaMap.Keys | Sort-Object { [datetime]$_ }
 
-        $current   = 0
-        $peak      = 0
+        $current = 0
+        $peak = 0
         $peakSlots = New-Object System.Collections.Generic.List[datetime]
 
         foreach ($slot in $sortedSlots) {
-            $slotDt   = [datetime]$slot
+            $slotDt = [datetime]$slot
             $current += [int]$deltaMap[$slotDt]
 
             if ($current -gt $peak) {
@@ -600,7 +600,7 @@ function Get-GCPeakConcurrentByDivision {
         }
 
         $firstPeak = if ($peakSlots.Count -gt 0) { $peakSlots[0] } else { $null }
-        $allPeaks  = if ($peakSlots.Count -gt 0) {
+        $allPeaks = if ($peakSlots.Count -gt 0) {
             ($peakSlots | ForEach-Object { $_.ToString('yyyy-MM-dd HH:mm') }) -join '; '
         }
         else {
@@ -608,11 +608,11 @@ function Get-GCPeakConcurrentByDivision {
         }
 
         $results += [pscustomobject]@{
-            DivisionId            = $divId
-            DivisionName          = $divisionName
-            PeakConcurrentCalls   = $peak
-            FirstPeakMinuteLocal  = $firstPeak
-            AllPeakMinutesLocal   = $allPeaks
+            DivisionId           = $divId
+            DivisionName         = $divisionName
+            PeakConcurrentCalls  = $peak
+            FirstPeakMinuteLocal = $firstPeak
+            AllPeakMinutesLocal  = $allPeaks
         }
     }
 

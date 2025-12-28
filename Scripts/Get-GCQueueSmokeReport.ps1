@@ -10,24 +10,24 @@ Back-compat wrapper. Canonical implementation lives in GenesysCloud.OpsInsights.
 function Get-GCQueueSmokeReport {
     [CmdletBinding()]
     param(
-    [Parameter(Mandatory = $true)]
-    [string]$BaseUri,
+        [Parameter(Mandatory = $true)]
+        [string]$BaseUri,
 
-    [Parameter(Mandatory = $true)]
-    [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
 
-    [Parameter(Mandatory = $true)]
-    [string]$Interval,
+        [Parameter(Mandatory = $true)]
+        [string]$Interval,
 
-    [Parameter(Mandatory = $false)]
-    [string]$DivisionId,
+        [Parameter(Mandatory = $false)]
+        [string]$DivisionId,
 
-    [Parameter(Mandatory = $false)]
-    [string[]]$QueueIds,
+        [Parameter(Mandatory = $false)]
+        [string[]]$QueueIds,
 
-    [Parameter(Mandatory = $false)]
-    [int]$TopN = 10
-)
+        [Parameter(Mandatory = $false)]
+        [int]$TopN = 10
+    )
 
     Write-Verbose "NOTE: Get-GCQueueSmokeReport script wrapper is deprecated. Import GenesysCloud.OpsInsights and call the module function directly."
 
