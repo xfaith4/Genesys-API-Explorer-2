@@ -6021,6 +6021,8 @@ $Xaml = @"
 	                  <GridViewColumn Header="WaitingSince (UTC)" DisplayMemberBinding="{Binding WaitingSinceUtc}" Width="170"/>
 	                  <GridViewColumn Header="Required Skills" DisplayMemberBinding="{Binding RequiredSkills}" Width="320"/>
 	                  <GridViewColumn Header="Eligible Agents" DisplayMemberBinding="{Binding EligibleAgentsSummary}" Width="220"/>
+	                  <GridViewColumn Header="RoutingStatus" DisplayMemberBinding="{Binding EligibleStatusSummary}" Width="220"/>
+	                  <GridViewColumn Header="NOT_RESPONDING" DisplayMemberBinding="{Binding NotRespondingCount}" Width="120"/>
 	                </GridView>
 	              </ListView.View>
 	            </ListView>
@@ -7697,10 +7699,20 @@ if ($queueWaitResultsList -and $queueWaitDetailsText) {
                 $lines.Add("WaitingSinceUtc: $($selected.WaitingSinceUtc)") | Out-Null
                 $lines.Add("RequiredSkills: $($selected.RequiredSkills)") | Out-Null
                 $lines.Add("EligibleAgents ($(@($selected.EligibleAgentNames).Count)):" ) | Out-Null
-                foreach ($n in @($selected.EligibleAgentNames | Select-Object -First 50)) {
-                    $lines.Add("  - $n") | Out-Null
+                if ($selected.EligibleStatusSummary) { $lines.Add("Eligible RoutingStatus: $($selected.EligibleStatusSummary)") | Out-Null }
+                if ($null -ne $selected.NotRespondingCount) { $lines.Add("NOT_RESPONDING count: $($selected.NotRespondingCount)") | Out-Null }
+                foreach ($a in @($selected.EligibleAgents | Select-Object -First 50)) {
+                    $name = $a.Name
+                    $rs = ''
+                    try { if ($a.RoutingStatus -and ($a.RoutingStatus.PSObject.Properties.Name -contains 'status')) { $rs = [string]$a.RoutingStatus.status } } catch { $rs = '' }
+                    $pr = ''
+                    try { if ($a.Presence -and ($a.Presence.PSObject.Properties.Name -contains 'presenceDefinition')) { $pr = [string]$a.Presence.presenceDefinition.systemPresence } } catch { $pr = '' }
+                    if ([string]::IsNullOrWhiteSpace($rs)) { $rs = 'unknown' }
+                    $suffix = ''
+                    if ($pr) { $suffix = " | presence=$pr" }
+                    $lines.Add("  - $name | routingStatus=$rs$suffix") | Out-Null
                 }
-                if (@($selected.EligibleAgentNames).Count -gt 50) { $lines.Add("  ...") | Out-Null }
+                if (@($selected.EligibleAgents).Count -gt 50) { $lines.Add("  ...") | Out-Null }
                 $queueWaitDetailsText.Text = ($lines -join "`n")
             }
             catch {
@@ -8197,7 +8209,7 @@ function Get-RoutingSkillNameMap {
     return $map
 }
 
-function Get-QueueMembersWithSkills {
+	function Get-QueueMembersWithSkills {
     param(
         [Parameter(Mandatory)]
         [string]$QueueId
@@ -8214,7 +8226,7 @@ function Get-QueueMembersWithSkills {
     $maxPages = 25
 
     for ($i = 0; $i -lt $maxPages; $i++) {
-        $path = "/api/v2/routing/queues/$QueueId/members?pageSize=$pageSize&pageNumber=$page&sortOrder=asc&expand=skills"
+        $path = "/api/v2/routing/queues/$QueueId/members?pageSize=$pageSize&pageNumber=$page&sortOrder=asc&expand=skills&expand=routingStatus&expand=presence"
         $resp = Invoke-GCRequest -Method 'GET' -BaseUri $ApiBaseUrl -AccessToken ($token.Trim()) -Path $path
         $entities = @()
         try { $entities = @($resp.entities) } catch { $entities = @() }
@@ -8244,10 +8256,26 @@ function Get-QueueMembersWithSkills {
                 if ($sid) { [void]$skillIds.Add($sid) }
             }
 
+            $routingStatus = $null
+            try {
+                if ($entity.PSObject.Properties.Name -contains 'routingStatus') { $routingStatus = $entity.routingStatus }
+                elseif ($userObj.PSObject.Properties.Name -contains 'routingStatus') { $routingStatus = $userObj.routingStatus }
+            }
+            catch { $routingStatus = $null }
+
+            $presence = $null
+            try {
+                if ($entity.PSObject.Properties.Name -contains 'presence') { $presence = $entity.presence }
+                elseif ($userObj.PSObject.Properties.Name -contains 'presence') { $presence = $userObj.presence }
+            }
+            catch { $presence = $null }
+
             $members.Add([pscustomobject]@{
                     UserId   = $userId
                     Name     = $userName
                     SkillIds = @($skillIds)
+                    RoutingStatus = $routingStatus
+                    Presence      = $presence
                 }) | Out-Null
         }
 
@@ -8396,28 +8424,69 @@ function Get-QueueWaitCoverageReport {
         )
         $requiredText = if ($requiredNames.Count -gt 0) { ($requiredNames -join ', ') } else { '<none found>' }
 
-        $eligible = @()
+        $eligibleAgentDetails = New-Object System.Collections.Generic.List[object]
         foreach ($m in $members) {
             if ($requiredIds.Count -eq 0) {
-                $eligible += $m.Name
+                $eligibleAgentDetails.Add([pscustomobject]@{
+                        UserId        = $m.UserId
+                        Name          = $m.Name
+                        Presence      = $m.Presence
+                        RoutingStatus = $m.RoutingStatus
+                    }) | Out-Null
                 continue
             }
             $hasAll = $true
             foreach ($rid in $requiredIds) {
                 if (-not ($m.SkillIds -contains $rid)) { $hasAll = $false; break }
             }
-            if ($hasAll) { $eligible += $m.Name }
+            if ($hasAll) {
+                $eligibleAgentDetails.Add([pscustomobject]@{
+                        UserId        = $m.UserId
+                        Name          = $m.Name
+                        Presence      = $m.Presence
+                        RoutingStatus = $m.RoutingStatus
+                    }) | Out-Null
+            }
         }
 
-        $eligibleSummary = if ($eligible.Count -eq 0) { '0' } elseif ($eligible.Count -le 5) { "$($eligible.Count): $($eligible -join ', ')" } else { "$($eligible.Count): $($eligible[0..4] -join ', '), ..." }
+        $eligibleNames = @($eligibleAgentDetails | ForEach-Object { $_.Name })
+        $eligibleCount = $eligibleNames.Count
+
+        $notResponding = 0
+        $statusCounts = @{}
+        foreach ($a in @($eligibleAgentDetails)) {
+            $code = ''
+            try {
+                if ($a.RoutingStatus -and ($a.RoutingStatus.PSObject.Properties.Name -contains 'status')) {
+                    $code = [string]$a.RoutingStatus.status
+                }
+            }
+            catch { $code = '' }
+            if ([string]::IsNullOrWhiteSpace($code)) { $code = 'unknown' }
+            if (-not $statusCounts.ContainsKey($code)) { $statusCounts[$code] = 0 }
+            $statusCounts[$code] = [int]$statusCounts[$code] + 1
+            if ($code -match '^NOT_RESPONDING$') { $notResponding++ }
+        }
+
+        $statusSummary = if ($statusCounts.Count -eq 0) {
+            ''
+        }
+        else {
+            ($statusCounts.Keys | Sort-Object | ForEach-Object { "$_=$($statusCounts[$_])" }) -join '; '
+        }
+
+        $eligibleSummary = if ($eligibleCount -eq 0) { '0' } elseif ($eligibleCount -le 5) { "${eligibleCount}: $($eligibleNames -join ', ')" } else { "${eligibleCount}: $($eligibleNames[0..4] -join ', '), ..." }
 
         $rows.Add([pscustomobject]@{
                 ConversationId        = $cid
                 WaitingSinceUtc       = $waitingSince
                 RequiredSkillIds      = $requiredIds
                 RequiredSkills        = $requiredText
-                EligibleAgentNames    = $eligible
+                EligibleAgentNames    = $eligibleNames
+                EligibleAgents        = @($eligibleAgentDetails)
                 EligibleAgentsSummary = $eligibleSummary
+                EligibleStatusSummary = $statusSummary
+                NotRespondingCount    = $notResponding
             }) | Out-Null
     }
 

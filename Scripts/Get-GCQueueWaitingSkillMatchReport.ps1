@@ -1,409 +1,378 @@
 ### BEGIN FILE: Get-GCQueueWaitingSkillMatchReport.ps1
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory)]
+  [string]$QueueId,
+
+  # Interval window for analytics detail query. Examples:
+  # "2025-12-29T12:00:00.000Z/2025-12-29T12:15:00.000Z"
+  # "2025-12-29T12:00:00.000Z/2025-12-29T12:20:00.000Z"
+  [Parameter(Mandatory)]
+  [string]$Interval,
+
+  # If you already have a conversations details response saved (like your uploaded sample),
+  # you can point to it for offline/fast dev.
+  [string]$AnalyticsDetailsJsonPath = "",
+
+  # If you want to try true real-time queue inventory first (recommended)
+  [switch]$PreferRoutingQueueConversations,
+
+  # Output
+  [ValidateSet('Object','Json','Csv')]
+  [string]$OutputMode = 'Object',
+
+  [string]$OutPath = ""
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Invoke-GCRequest {
-    param(
-        [Parameter(Mandatory)] [string]$BaseUri,
-        [Parameter(Mandatory)] [string]$AccessToken,
-        [Parameter(Mandatory)] [ValidateSet('GET','POST','PUT','PATCH','DELETE')] [string]$Method,
-        [Parameter(Mandatory)] [string]$Path,
-        [hashtable]$Query,
-        [object]$Body,
-        [int]$MaxRetries = 6
-    )
+# -----------------------------
+# Request plumbing
+# -----------------------------
+function Invoke-GCRequestLocal {
+  param(
+    [Parameter(Mandatory)][ValidateSet('GET','POST','PUT','PATCH','DELETE')] [string]$Method,
+    [Parameter(Mandatory)][string]$Path,
+    [object]$Body = $null,
+    [hashtable]$Query = $null
+  )
 
-    $uriBuilder = [System.UriBuilder]::new(($BaseUri.TrimEnd('/') + '/' + $Path.TrimStart('/')))
-    if ($Query) {
-        $pairs = foreach ($k in $Query.Keys) {
-            $v = $Query[$k]
-            if ($null -ne $v -and "$v" -ne '') {
-                '{0}={1}' -f [System.Uri]::EscapeDataString($k), [System.Uri]::EscapeDataString([string]$v)
-            }
-        }
-        $uriBuilder.Query = ($pairs -join '&')
+  if (-not $script:GC_BaseUri -or -not $script:GC_AccessToken) {
+    throw "Missing `$GC_BaseUri and/or `$GC_AccessToken. If you're in the API Explorer, provide an Invoke-GCRequest function OR set these globals."
+  }
+
+  $uri = $script:GC_BaseUri.TrimEnd('/') + $Path
+  if ($Query) {
+    $qs = ($Query.GetEnumerator() | ForEach-Object {
+      "{0}={1}" -f [uri]::EscapeDataString([string]$_.Key), [uri]::EscapeDataString([string]$_.Value)
+    }) -join '&'
+    if ($qs) { $uri = "$($uri)?$($qs)" }
+  }
+
+  $headers = @{
+    Authorization = "Bearer $($script:GC_AccessToken)"
+    Accept        = 'application/json'
+  }
+
+  $irmParams = @{
+    Method  = $Method
+    Uri     = $uri
+    Headers = $headers
+  }
+
+  if ($null -ne $Body) {
+    $irmParams.ContentType = 'application/json'
+    $irmParams.Body = ($Body | ConvertTo-Json -Depth 20)
+  }
+
+  # Minimal backoff for 429/5xx
+  $maxAttempts = 6
+  for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    try {
+      return Invoke-RestMethod @irmParams
+    } catch {
+      $msg = "$_"
+      $retry = ($msg -match '\b429\b') -or ($msg -match '\b5\d\d\b')
+      if (-not $retry -or $attempt -eq $maxAttempts) { throw }
+
+      $sleepSec = [Math]::Min(30, [Math]::Pow(2, $attempt))
+      Start-Sleep -Seconds $sleepSec
     }
-
-    $headers = @{
-        Authorization = "Bearer $AccessToken"
-        Accept        = 'application/json'
-    }
-
-    $attempt = 0
-    while ($true) {
-        try {
-            $irmParams = @{
-                Method  = $Method
-                Uri     = $uriBuilder.Uri.AbsoluteUri
-                Headers = $headers
-            }
-            if ($null -ne $Body) {
-                $irmParams.ContentType = 'application/json'
-                $irmParams.Body = ($Body | ConvertTo-Json -Depth 15)
-            }
-            return Invoke-RestMethod @irmParams
-        }
-        catch {
-            $attempt++
-
-            $resp = $_.Exception.Response
-            $status = $null
-            if ($resp -and $resp.StatusCode) { $status = [int]$resp.StatusCode }
-
-            # Backoff on 429 / transient 5xx
-            if ($attempt -le $MaxRetries -and ($status -eq 429 -or ($status -ge 500 -and $status -le 599))) {
-                $sleepMs = [Math]::Min(30000, (250 * [Math]::Pow(2, $attempt)))
-                Start-Sleep -Milliseconds $sleepMs
-                continue
-            }
-
-            throw
-        }
-    }
+  }
 }
 
-function Get-GCPaged {
-    param(
-        [Parameter(Mandatory)] [string]$BaseUri,
-        [Parameter(Mandatory)] [string]$AccessToken,
-        [Parameter(Mandatory)] [string]$Path,
-        [hashtable]$Query = @{},
-        [string]$ItemsProperty = 'entities',
-        [int]$PageSize = 100
-    )
+# If your Explorer already has Invoke-GCRequest, we’ll use it.
+function Invoke-GCRequestCompat {
+  param(
+    [Parameter(Mandatory)][ValidateSet('GET','POST','PUT','PATCH','DELETE')] [string]$Method,
+    [Parameter(Mandatory)][string]$Path,
+    [object]$Body = $null,
+    [hashtable]$Query = $null
+  )
 
-    $pageNumber = 1
-    $all = New-Object System.Collections.Generic.List[object]
+  if (Get-Command -Name Invoke-GCRequest -ErrorAction SilentlyContinue) {
+    # Adapt if your Invoke-GCRequest signature differs
+    return Invoke-GCRequest -Method $Method -Path $Path -Body $Body -Query $Query
+  }
 
-    while ($true) {
-        $q = @{}
-        foreach ($k in $Query.Keys) { $q[$k] = $Query[$k] }
-        $q.pageSize = $PageSize
-        $q.pageNumber = $pageNumber
-
-        $resp = Invoke-GCRequest -BaseUri $BaseUri -AccessToken $AccessToken -Method GET -Path $Path -Query $q
-
-        $items = $null
-        if ($resp.PSObject.Properties.Name -contains $ItemsProperty) {
-            $items = $resp.$ItemsProperty
-        } elseif ($resp.PSObject.Properties.Name -contains 'items') {
-            $items = $resp.items
-        }
-
-        if ($items) { foreach ($i in $items) { $all.Add($i) } }
-
-        # Common Genesys list shape includes pageCount/pageNumber OR nextUri
-        $pageCount = $null
-        if ($resp.PSObject.Properties.Name -contains 'pageCount') { $pageCount = [int]$resp.pageCount }
-
-        if ($pageCount -and $pageNumber -lt $pageCount) {
-            $pageNumber++
-            continue
-        }
-
-        # If no paging metadata, stop when fewer than requested returned
-        if (-not $pageCount -and ($items.Count -ge $PageSize)) {
-            $pageNumber++
-            continue
-        }
-
-        break
-    }
-
-    return $all
+  return Invoke-GCRequestLocal -Method $Method -Path $Path -Body $Body -Query $Query
 }
 
-function Resolve-GCSkillNames {
-    param(
-        [Parameter(Mandatory)] [string]$BaseUri,
-        [Parameter(Mandatory)] [string]$AccessToken
-    )
+# -----------------------------
+# Helpers: Extract required skills from Analytics conversation details
+# -----------------------------
+function Get-RequiredSkillIdsFromConversationDetails {
+  param(
+    [Parameter(Mandatory)][object]$Conversation,
+    [Parameter(Mandatory)][string]$QueueId
+  )
 
-    $skills = Get-GCPaged -BaseUri $BaseUri -AccessToken $AccessToken -Path '/api/v2/routing/skills' -ItemsProperty 'entities' -PageSize 100
-    $map = @{}
-    foreach ($s in $skills) {
-        if ($s.id) { $map[$s.id] = $s.name }
-    }
-    return $map
-}
+  $skillIds = New-Object System.Collections.Generic.HashSet[string]
 
-function Get-GCQueueMembers {
-    param(
-        [Parameter(Mandatory)] [string]$BaseUri,
-        [Parameter(Mandatory)] [string]$AccessToken,
-        [Parameter(Mandatory)] [string]$QueueId,
-        [switch]$ExpandPresence
-    )
-
-    $q = @{ joined = 'true' }
-    if ($ExpandPresence) { $q.expand = 'presence' }
-
-    # Community examples show /members supports joined + expand=presence :contentReference[oaicite:8]{index=8}
-    return Get-GCPaged -BaseUri $BaseUri -AccessToken $AccessToken -Path "/api/v2/routing/queues/$QueueId/members" -Query $q -ItemsProperty 'entities' -PageSize 100
-}
-
-function Get-GCUserRoutingSkills {
-    param(
-        [Parameter(Mandatory)] [string]$BaseUri,
-        [Parameter(Mandatory)] [string]$AccessToken,
-        [Parameter(Mandatory)] [string]$UserId
-    )
-    # /api/v2/users/{userId}/routingskills is used to retrieve skills + proficiency :contentReference[oaicite:9]{index=9}
-    return Invoke-GCRequest -BaseUri $BaseUri -AccessToken $AccessToken -Method GET -Path "/api/v2/users/$UserId/routingskills"
-}
-
-function Get-GCQueueWaitingConversations {
-    param(
-        [Parameter(Mandatory)] [string]$BaseUri,
-        [Parameter(Mandatory)] [string]$AccessToken,
-        [Parameter(Mandatory)] [string]$QueueId
-    )
-
-    # Try “all media” endpoint first; fall back to media-specific.
-    $pathsToTry = @(
-        "/api/v2/routing/queues/$QueueId/conversations",
-        "/api/v2/routing/queues/$QueueId/conversations/calls",
-        "/api/v2/routing/queues/$QueueId/conversations/chats",   # confirmed exists :contentReference[oaicite:10]{index=10}
-        "/api/v2/routing/queues/$QueueId/conversations/emails",
-        "/api/v2/routing/queues/$QueueId/conversations/messages"
-    )
-
-    $all = New-Object System.Collections.Generic.List[object]
-
-    foreach ($p in $pathsToTry) {
-        try {
-            $resp = Invoke-GCRequest -BaseUri $BaseUri -AccessToken $AccessToken -Method GET -Path $p -Query @{ pageSize = 100; pageNumber = 1 }
-
-            # Different endpoints return slightly different shapes; normalize into items
-            $items = $null
-            foreach ($prop in @('entities','conversations','calls','chats','emails','messages','items')) {
-                if ($resp.PSObject.Properties.Name -contains $prop) { $items = $resp.$prop; break }
-            }
-            if (-not $items -and $resp) { $items = @($resp) }
-
-            foreach ($it in @($items)) {
-                # Standardize a minimal record
-                $convId = $it.id
-                if (-not $convId -and $it.conversationId) { $convId = $it.conversationId }
-
-                if ($convId) {
-                    $all.Add([pscustomobject]@{
-                        conversationId = $convId
-                        mediaType      = $it.mediaType
-                        raw            = $it
-                        sourcePath     = $p
-                    })
-                }
-            }
+  # Walk all participants/sessions/segments and capture requestedRoutingSkillIds on any segment in this queue.
+  foreach ($p in @($Conversation.participants)) {
+    foreach ($s in @($p.sessions)) {
+      foreach ($seg in @($s.segments)) {
+        if ($seg.queueId -and ($seg.queueId -eq $QueueId)) {
+          foreach ($sid in @($seg.requestedRoutingSkillIds)) {
+            if ($sid) { [void]$skillIds.Add([string]$sid) }
+          }
         }
-        catch {
-            # ignore 404/400 on non-existent variants
-            $resp = $_.Exception.Response
-            $status = $null
-            if ($resp -and $resp.StatusCode) { $status = [int]$resp.StatusCode }
-            if ($status -in 400,404) { continue }
-            throw
-        }
+      }
     }
 
-    # De-dupe by conversationId
-    return $all | Group-Object conversationId | ForEach-Object { $_.Group[0] }
+    # Fallback: some orgs stuff a CSV into an attribute like ivr.Skills
+    if ($p.attributes -and $p.attributes.'ivr.Skills') {
+      foreach ($sid in ($p.attributes.'ivr.Skills' -split '\s*,\s*')) {
+        if ($sid) { [void]$skillIds.Add([string]$sid) }
+      }
+    }
+  }
+
+  return @($skillIds)
 }
 
-function Get-GCRoutingConversation {
-    param(
-        [Parameter(Mandatory)] [string]$BaseUri,
-        [Parameter(Mandatory)] [string]$AccessToken,
-        [Parameter(Mandatory)] [string]$ConversationId
-    )
+function Get-QueueConversationsFromAnalyticsDetails {
+  param(
+    [Parameter(Mandatory)][object]$AnalyticsDetails,
+    [Parameter(Mandatory)][string]$QueueId
+  )
 
-    # Routing Conversation resource (also used for setting/removing skills while waiting) :contentReference[oaicite:11]{index=11}
-    return Invoke-GCRequest -BaseUri $BaseUri -AccessToken $AccessToken -Method GET -Path "/api/v2/routing/conversations/$ConversationId"
+  # The sample file shows the list is a top-level array of conversation objects (shape depends on how you saved it).
+  $convs = @()
+  if ($AnalyticsDetails -is [System.Collections.IEnumerable] -and -not ($AnalyticsDetails -is [string])) {
+    $convs = @($AnalyticsDetails)
+  } elseif ($AnalyticsDetails.conversations) {
+    $convs = @($AnalyticsDetails.conversations)
+  } else {
+    $convs = @($AnalyticsDetails)
+  }
+
+  # Filter: any segment with this queueId
+  return $convs | Where-Object {
+    $c = $_
+    foreach ($p in @($c.participants)) {
+      foreach ($s in @($p.sessions)) {
+        foreach ($seg in @($s.segments)) {
+          if ($seg.queueId -eq $QueueId) { return $true }
+        }
+      }
+    }
+    return $false
+  }
 }
 
-function Extract-RequiredSkills {
-    param(
-        [Parameter(Mandatory)] [object]$RoutingConversation
-    )
+# -----------------------------
+# Agent skills + queue membership
+# -----------------------------
+$script:UserSkillsCache = @{}
+function Get-UserRoutingSkillIds {
+  param([Parameter(Mandatory)][string]$UserId)
 
-    # Best-effort schema support (because orgs/features can differ).
-    # We try several likely places skills might appear.
-    $candidates = @()
+  if ($script:UserSkillsCache.ContainsKey($UserId)) {
+    return $script:UserSkillsCache[$UserId]
+  }
 
-    foreach ($path in @(
-        'acds',                       # sometimes list of skills/requirements
-        'acdSkills',
-        'routingData.acdSkills',
-        'routingData.skills',
-        'skills',
-        'requestedRoutingSkills'
-    )) {
-        $cur = $RoutingConversation
-        $ok = $true
-        foreach ($seg in $path.Split('.')) {
-            if ($null -eq $cur) { $ok = $false; break }
-            if ($cur.PSObject.Properties.Name -contains $seg) { $cur = $cur.$seg } else { $ok = $false; break }
-        }
-        if ($ok -and $cur) { $candidates += @($cur) }
-    }
-
-    # Normalize into @([pscustomobject]@{ id=''; proficiency=0 })
-    $out = New-Object System.Collections.Generic.List[object]
-    foreach ($cand in $candidates) {
-        foreach ($s in @($cand)) {
-            if ($s -is [string]) {
-                $out.Add([pscustomobject]@{ id = $s; proficiency = $null })
-            }
-            elseif ($s.PSObject.Properties.Name -contains 'id') {
-                $prof = $null
-                foreach ($pName in @('proficiency','minimumProficiency','minProficiency')) {
-                    if ($s.PSObject.Properties.Name -contains $pName) { $prof = $s.$pName; break }
-                }
-                $out.Add([pscustomobject]@{ id = $s.id; proficiency = $prof })
-            }
-            elseif ($s.PSObject.Properties.Name -contains 'skillId') {
-                $out.Add([pscustomobject]@{ id = $s.skillId; proficiency = ($s.proficiency) })
-            }
-        }
-    }
-
-    # De-dupe
-    return $out | Group-Object id | ForEach-Object { $_.Group[0] }
+  $skills = Invoke-GCRequestCompat -Method GET -Path "/api/v2/users/$($UserId)/routingskills"
+  # Typical response is an array of { id, name, proficiency, state } objects (shape may differ slightly).
+  $ids = @($skills | Where-Object { $_.state -eq 'active' -or -not $_.state } | ForEach-Object { $_.id }) | Where-Object { $_ }
+  $script:UserSkillsCache[$UserId] = $ids
+  return $ids
 }
 
-function Get-GCQueueWaitingSkillMatchReport {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)] [string]$QueueId,
+function Test-HasAllSkills {
+  param(
+    [string[]]$UserSkillIds,
+    [string[]]$RequiredSkillIds
+  )
 
-        # Interval here is “how often to refresh”, not a historical time window
-        [int]$PollSeconds = 0,
-        [int]$Iterations  = 1,
+  if (-not $RequiredSkillIds -or $RequiredSkillIds.Count -eq 0) { return $true }
+  if (-not $UserSkillIds) { return $false }
 
-        # Genesys region host, example: https://api.usw2.pure.cloud
-        [Parameter(Mandatory)] [string]$BaseUri,
-        [Parameter(Mandatory)] [string]$AccessToken,
+  $set = New-Object System.Collections.Generic.HashSet[string]
+  foreach ($id in $UserSkillIds) { if ($id) { [void]$set.Add([string]$id) } }
 
-        [switch]$ExpandPresence,
-        [switch]$OnlyJoinedMembers = $true,
-        [switch]$OnlyRoutableAgents = $false
-    )
+  foreach ($req in $RequiredSkillIds) {
+    if ($req -and -not $set.Contains([string]$req)) { return $false }
+  }
+  return $true
+}
 
-    $skillNameMap = Resolve-GCSkillNames -BaseUri $BaseUri -AccessToken $AccessToken
+function Get-QueueMembersOnQueue {
+  param([Parameter(Mandatory)][string]$QueueId)
 
-    $members = Get-GCQueueMembers -BaseUri $BaseUri -AccessToken $AccessToken -QueueId $QueueId -ExpandPresence:$ExpandPresence
-    $memberIds = @($members | ForEach-Object { $_.id } | Where-Object { $_ })
+  # Community guidance: use joined=true + presence=ON queue to avoid “member but not actually on-queue” cases. :contentReference[oaicite:5]{index=5}
+  $resp = Invoke-GCRequestCompat -Method GET -Path "/api/v2/routing/queues/$($QueueId)/members" -Query @{
+    joined   = 'true'
+    presence = 'ON queue'
+    pageSize = '100'
+    pageNumber = '1'
+  }
 
-    # Cache agent skills
-    $agentSkillCache = @{}
-    foreach ($uid in $memberIds) {
-        try {
-            $rs = Get-GCUserRoutingSkills -BaseUri $BaseUri -AccessToken $AccessToken -UserId $uid
-            $skills = @()
+  # Handle either { entities: [...] } or straight array
+  if ($resp.entities) { return @($resp.entities) }
+  return @($resp)
+}
 
-            # typical shape: entities/items; normalize
-            if ($rs.PSObject.Properties.Name -contains 'entities') { $skills = @($rs.entities) }
-            elseif ($rs.PSObject.Properties.Name -contains 'items') { $skills = @($rs.items) }
-            else { $skills = @($rs) }
+# -----------------------------
+# Primary: build report rows
+# -----------------------------
+function New-QueueWaitingSkillMatchReport {
+  param(
+    [Parameter(Mandatory)][string]$QueueId,
+    [Parameter(Mandatory)][string]$Interval,
+    [string]$AnalyticsDetailsJsonPath,
+    [switch]$PreferRoutingQueueConversations
+  )
 
-            $agentSkillCache[$uid] = $skills | ForEach-Object {
-                [pscustomobject]@{
-                    id          = ($_.id ?? $_.skillId)
-                    name        = ($skillNameMap[($_.id ?? $_.skillId)])
-                    proficiency = ($_.proficiency ?? $_.rating)
-                }
-            }
+  # 1) Gather waiting conversations
+  $waitingConversations = @()
+
+  if ($PreferRoutingQueueConversations) {
+    try {
+      $qc = Invoke-GCRequestCompat -Method GET -Path "/api/v2/routing/queues/$($QueueId)/conversations"
+      if ($qc.entities) { $waitingConversations = @($qc.entities) } else { $waitingConversations = @($qc) }
+    } catch {
+      # Not fatal; fall back to analytics details query path
+      $waitingConversations = @()
+    }
+  }
+
+  # 2) Pull analytics conversation details (either from file, or live query)
+  $details = $null
+  if ($AnalyticsDetailsJsonPath) {
+    $details = Get-Content -LiteralPath $AnalyticsDetailsJsonPath -Raw | ConvertFrom-Json
+  } else {
+    # Live details query. Your Explorer likely already knows how to call this.
+    # NOTE: The exact predicate shape varies; this is a common working pattern for queueId + interval.
+    $body = @{
+      interval   = $Interval
+      order      = 'asc'
+      orderBy    = 'conversationStart'
+      paging     = @{ pageSize = 100; pageNumber = 1 }
+      segmentFilters = @(
+        @{
+          type = 'and'
+          predicates = @(
+            @{ type = 'dimension'; dimension = 'queueId'; operator = 'matches'; value = $QueueId }
+          )
         }
-        catch {
-            $agentSkillCache[$uid] = @()
-        }
+      )
+    }
+    $details = Invoke-GCRequestCompat -Method POST -Path "/api/v2/analytics/conversations/details/query" -Body $body
+  }
+
+  $detailConvs = Get-QueueConversationsFromAnalyticsDetails -AnalyticsDetails $details -QueueId $QueueId
+
+  # If we successfully got real-time queue convs, restrict to those IDs; otherwise just use detail set
+  if ($waitingConversations -and $waitingConversations.Count -gt 0) {
+    $idSet = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($c in $waitingConversations) { if ($c.id) { [void]$idSet.Add([string]$c.id) } }
+    $detailConvs = $detailConvs | Where-Object { $_.conversationId -and $idSet.Contains([string]$_.conversationId) -or $_.id -and $idSet.Contains([string]$_.id) }
+  }
+
+  # 3) Get candidate agents (on-queue members)
+  $members = Get-QueueMembersOnQueue -QueueId $QueueId
+
+  # Preload user skills (cached) + lightweight identity
+  $agentIndex = foreach ($m in $members) {
+    $uid = $m.user.id
+    if (-not $uid) { $uid = $m.userId }
+    if (-not $uid) { continue }
+
+    $skillIds = Get-UserRoutingSkillIds -UserId $uid
+
+    [pscustomobject]@{
+      UserId       = $uid
+      Name         = $m.user.name
+      RoutingStatus = $m.routingStatus
+      Presence     = $m.presence
+      SkillIds     = $skillIds
+    }
+  }
+
+  # 4) Assemble rows
+  $rows = foreach ($c in $detailConvs) {
+    $cid = $c.conversationId
+    if (-not $cid) { $cid = $c.id }
+
+    $req = Get-RequiredSkillIdsFromConversationDetails -Conversation $c -QueueId $QueueId
+
+    $matchingAgents = $agentIndex | Where-Object { Test-HasAllSkills -UserSkillIds $_.SkillIds -RequiredSkillIds $req } |
+      Select-Object UserId, Name, Presence, RoutingStatus
+
+    # Try to surface ANI/DNIS if present
+    $ani = $null
+    $dnis = $null
+    foreach ($p in @($c.participants)) {
+      foreach ($s in @($p.sessions)) {
+        if (-not $ani -and $s.ani) { $ani = $s.ani }
+        if (-not $dnis -and $s.dnis) { $dnis = $s.dnis }
+      }
     }
 
-    for ($i = 1; $i -le $Iterations; $i++) {
-        $waiting = Get-GCQueueWaitingConversations -BaseUri $BaseUri -AccessToken $AccessToken -QueueId $QueueId
-
-        $rows = foreach ($w in $waiting) {
-            $routing = $null
-            $required = @()
-            try {
-                $routing = Get-GCRoutingConversation -BaseUri $BaseUri -AccessToken $AccessToken -ConversationId $w.conversationId
-                $required = Extract-RequiredSkills -RoutingConversation $routing
-            }
-            catch {
-                # keep going; required skills will be unknown
-                $routing = $null
-                $required = @()
-            }
-
-            $requiredNamed = $required | ForEach-Object {
-                [pscustomobject]@{
-                    id          = $_.id
-                    name        = ($skillNameMap[$_.id] ?? $null)
-                    proficiency = $_.proficiency
-                }
-            }
-
-            $candidates = New-Object System.Collections.Generic.List[object]
-            foreach ($uid in $memberIds) {
-                $agentSkills = @($agentSkillCache[$uid])
-
-                $ok = $true
-                foreach ($req in $required) {
-                    $match = $agentSkills | Where-Object { $_.id -eq $req.id } | Select-Object -First 1
-                    if (-not $match) { $ok = $false; break }
-
-                    if ($null -ne $req.proficiency -and $null -ne $match.proficiency) {
-                        if ([int]$match.proficiency -lt [int]$req.proficiency) { $ok = $false; break }
-                    }
-                }
-
-                if ($ok) {
-                    $mem = $members | Where-Object { $_.id -eq $uid } | Select-Object -First 1
-                    $candidates.Add([pscustomobject]@{
-                        userId    = $uid
-                        name      = ($mem.name ?? $mem.user.name ?? $null)
-                        presence  = ($mem.presence.presenceDefinition.systemPresence ?? $mem.presence ?? $null)
-                        skillsHit = $requiredNamed
-                    })
-                }
-            }
-
-            [pscustomobject]@{
-                queueId             = $QueueId
-                conversationId      = $w.conversationId
-                mediaType           = $w.mediaType
-                requiredSkills      = $requiredNamed
-                candidateAgents     = @($candidates)
-                candidateAgentCount = @($candidates).Count
-                sourcePath          = $w.sourcePath
-                routingRaw          = $routing
-                queueItemRaw        = $w.raw
-                capturedAt          = (Get-Date).ToString('o')
-            }
-        }
-
-        $rows | Sort-Object -Property candidateAgentCount, conversationId
-
-        if ($i -lt $Iterations -and $PollSeconds -gt 0) {
-            Start-Sleep -Seconds $PollSeconds
-        }
+    [pscustomobject]@{
+      QueueId            = $QueueId
+      ConversationId     = $cid
+      Ani                = $ani
+      Dnis               = $dnis
+      RequiredSkillIds   = $req
+      MatchingAgentCount = @($matchingAgents).Count
+      MatchingAgents     = $matchingAgents
     }
+  }
+
+  return $rows
+}
+
+$report = New-QueueWaitingSkillMatchReport -QueueId $QueueId -Interval $Interval -AnalyticsDetailsJsonPath $AnalyticsDetailsJsonPath -PreferRoutingQueueConversations:$PreferRoutingQueueConversations
+
+switch ($OutputMode) {
+  'Object' {
+    $report
+  }
+  'Json' {
+    $json = $report | ConvertTo-Json -Depth 10
+    if ($OutPath) { Set-Content -LiteralPath $OutPath -Value $json -Encoding UTF8 }
+    $json
+  }
+  'Csv' {
+    if (-not $OutPath) { throw "OutputMode=Csv requires -OutPath" }
+    # Flatten MatchingAgents for CSV
+    $flat = $report | ForEach-Object {
+      $row = $_
+      if (-not $row.MatchingAgents -or $row.MatchingAgents.Count -eq 0) {
+        [pscustomobject]@{
+          QueueId = $row.QueueId
+          ConversationId = $row.ConversationId
+          Ani = $row.Ani
+          Dnis = $row.Dnis
+          RequiredSkillIds = ($row.RequiredSkillIds -join ',')
+          AgentUserId = ''
+          AgentName = ''
+          Presence = ''
+          RoutingStatus = ''
+        }
+      } else {
+        foreach ($a in $row.MatchingAgents) {
+          [pscustomobject]@{
+            QueueId = $row.QueueId
+            ConversationId = $row.ConversationId
+            Ani = $row.Ani
+            Dnis = $row.Dnis
+            RequiredSkillIds = ($row.RequiredSkillIds -join ',')
+            AgentUserId = $a.UserId
+            AgentName = $a.Name
+            Presence = $a.Presence
+            RoutingStatus = $a.RoutingStatus
+          }
+        }
+      }
+    }
+    $flat | Export-Csv -LiteralPath $OutPath -NoTypeInformation -Encoding UTF8
+    Get-Item -LiteralPath $OutPath
+  }
 }
 
 ### END FILE: Get-GCQueueWaitingSkillMatchReport.ps1
-
-<#
-# One snapshot
-. .\Get-GCQueueWaitingSkillMatchReport.ps1
-
-$report = Get-GCQueueWaitingSkillMatchReport `
-  -QueueId 'YOUR-QUEUE-GUID' `
-  -BaseUri 'https://api.usw2.pure.cloud' `
-  -AccessToken $env:GC_ACCESS_TOKEN `
-  -ExpandPresence
-
-$report | Select-Object conversationId, mediaType, candidateAgentCount,
-  @{n='requiredSkills';e={($_.requiredSkills.name -join ', ')}} |
-  Format-Table -AutoSize
-
-#>
