@@ -23,6 +23,40 @@ if (-not $ScriptRoot) {
 $DeveloperDocsUrl = "https://developer.genesys.cloud"
 $SupportDocsUrl = "https://help.mypurecloud.com"
 
+function Get-TraceLogPath {
+    try {
+        $base = [System.IO.Path]::GetTempPath()
+        if (-not $base) { $base = $ScriptRoot }
+        $stamp = (Get-Date).ToString('yyyyMMdd_HHmmss')
+        return (Join-Path -Path $base -ChildPath "GenesysApiExplorer.trace.$stamp.log")
+    }
+    catch {
+        return $null
+    }
+}
+
+$script:TraceEnabled = $false
+try {
+    $traceRaw = [string]$env:GENESYS_API_EXPLORER_TRACE
+    $script:TraceEnabled = ($traceRaw -match '^(1|true|yes|on)$')
+}
+catch { }
+
+$script:TraceLogPath = if ($script:TraceEnabled) { Get-TraceLogPath } else { $null }
+
+function Write-TraceLog {
+    param([string]$Message)
+
+    if (-not $script:TraceEnabled) { return }
+    if ([string]::IsNullOrWhiteSpace($script:TraceLogPath)) { return }
+
+    try {
+        $ts = (Get-Date).ToString('o')
+        Add-Content -LiteralPath $script:TraceLogPath -Value "$ts $Message" -Encoding utf8
+    }
+    catch { }
+}
+
 function Open-Url {
     param ([string]$Url)
 
@@ -42,11 +76,22 @@ function Launch-Url {
 
 function Get-FirstNonEmptyValue {
     param(
-        [Parameter(Mandatory)]
-        [object[]]$Values,
+        [Parameter()]
+        [AllowNull()]
+        [object[]]$Values = @(),
         [Parameter()]
         [object]$Default = $null
     )
+
+    if ($null -eq $Values -or $Values.Count -eq 0) {
+        try {
+            $caller = $null
+            try { $caller = (Get-PSCallStack | Select-Object -Skip 1 -First 1).Command } catch { }
+            Write-TraceLog "Get-FirstNonEmptyValue: Values is null/empty; returning default. Caller='$caller'"
+        }
+        catch { }
+        return $Default
+    }
 
     foreach ($v in $Values) {
         if ($null -eq $v) { continue }
@@ -77,13 +122,16 @@ function Get-InsightPackCatalog {
 
     $items = New-Object System.Collections.Generic.List[object]
     $script:InsightPackCatalogErrors = New-Object System.Collections.Generic.List[string]
+    Write-TraceLog "Get-InsightPackCatalog: PackDirectory='$PackDirectory' (exists=$(Test-Path -LiteralPath $PackDirectory)); LegacyPackDirectory='$LegacyPackDirectory' (exists=$(Test-Path -LiteralPath $LegacyPackDirectory))"
     foreach ($dir in $dirs) {
         $files = @()
         try {
             $files = @(Get-ChildItem -LiteralPath $dir -File -ErrorAction Stop | Where-Object { $_.Extension -eq '.json' } | Sort-Object Name)
+            Write-TraceLog "Get-InsightPackCatalog: dir='$dir' jsonCount=$($files.Count)"
         }
         catch {
             try { $script:InsightPackCatalogErrors.Add("$dir :: $($_.Exception.Message)") | Out-Null } catch { }
+            Write-TraceLog "Get-InsightPackCatalog: dir='$dir' enumerate error: $($_.Exception.Message)"
             continue
         }
 
@@ -92,7 +140,14 @@ function Get-InsightPackCatalog {
             try {
                 $raw = Get-Content -LiteralPath $packPath -Raw -Encoding utf8
                 $pack = $raw | ConvertFrom-Json
-                if (-not $pack -or -not $pack.id) { continue }
+                if (-not $pack) {
+                    Write-TraceLog "Get-InsightPackCatalog: file='$packPath' parsed pack is null"
+                    continue
+                }
+                if (-not $pack.id) {
+                    Write-TraceLog "Get-InsightPackCatalog: file='$packPath' missing/empty id"
+                    continue
+                }
 
                 $examples = @()
                 if ($pack -and ($pack.PSObject.Properties.Name -contains 'examples') -and $pack.examples) {
@@ -137,13 +192,16 @@ function Get-InsightPackCatalog {
                         Pack               = $pack
                         Display            = if ($pack.name) { "$($pack.name)  [$($pack.id)]" } else { [string]$pack.id }
                     }) | Out-Null
+                Write-TraceLog "Get-InsightPackCatalog: loaded id='$($pack.id)' name='$($pack.name)' file='$($file.Name)'"
             }
             catch {
                 try { $script:InsightPackCatalogErrors.Add("$packPath :: $($_.Exception.Message)") | Out-Null } catch { }
+                Write-TraceLog "Get-InsightPackCatalog: file='$packPath' parse error: $($_.Exception.Message)"
             }
         }
     }
 
+    Write-TraceLog "Get-InsightPackCatalog: totalLoaded=$($items.Count)"
     return @($items | Sort-Object Name, Id)
 }
 
@@ -5123,6 +5181,7 @@ function Resolve-WorkspaceRoot {
         [string[]]$StartDirectories
     )
 
+    Write-TraceLog "Resolve-WorkspaceRoot: startDirs=$(@($StartDirectories) -join ' | ')"
     foreach ($start in @($StartDirectories)) {
         if ([string]::IsNullOrWhiteSpace($start)) { continue }
         try {
@@ -5161,13 +5220,35 @@ if (-not $workspaceRoot) {
     $workspaceRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ScriptRoot))
 }
 
+# Allow overriding pack discovery when running from an installed module/EXE.
+# - `GENESYS_API_EXPLORER_PACKS_DIR` may point directly to the packs folder, or to the repo root.
 $insightPackRoot = Join-Path -Path (Join-Path -Path $workspaceRoot -ChildPath 'insights') -ChildPath 'packs'
+$packOverride = [string]$env:GENESYS_API_EXPLORER_PACKS_DIR
+if (-not [string]::IsNullOrWhiteSpace($packOverride)) {
+    try {
+        if (Test-Path -LiteralPath $packOverride) {
+            $overrideItem = Get-Item -LiteralPath $packOverride -ErrorAction SilentlyContinue
+            if ($overrideItem -and $overrideItem.PSIsContainer) {
+                $overrideDirect = Join-Path -Path (Join-Path -Path $overrideItem.FullName -ChildPath 'insights') -ChildPath 'packs'
+                if (Test-Path -LiteralPath $overrideDirect) {
+                    $insightPackRoot = $overrideDirect
+                }
+                else {
+                    $insightPackRoot = $overrideItem.FullName
+                }
+            }
+        }
+    }
+    catch { }
+}
 $legacyInsightPackRoot = Join-Path -Path $workspaceRoot -ChildPath 'insightpacks'
 $insightBriefingRoot = Join-Path -Path (Join-Path -Path $workspaceRoot -ChildPath 'insights') -ChildPath 'briefings'
 $legacyInsightBriefingRoot = Join-Path -Path $workspaceRoot -ChildPath 'InsightBriefings'
 $script:OpsInsightsManifest = Join-Path -Path $workspaceRoot -ChildPath 'src/GenesysCloud.OpsInsights/GenesysCloud.OpsInsights.psd1'
 $script:OpsInsightsModuleRoot = Split-Path -Parent $script:OpsInsightsManifest
 $script:OpsInsightsCoreManifest = Join-Path -Path $script:OpsInsightsModuleRoot -ChildPath '..\GenesysCloud.OpsInsights.Core\GenesysCloud.OpsInsights.Core.psd1'
+
+Write-TraceLog "Workspace/Pack roots: workspaceRoot='$workspaceRoot' scriptRoot='$ScriptRoot' insightPackRoot='$insightPackRoot' legacyInsightPackRoot='$legacyInsightPackRoot' override='$packOverride'"
 
 function Load-OpsInsightsScripts {
     if ($script:OpsInsightsScriptsLoaded) { return }
@@ -5621,6 +5702,8 @@ $Xaml = @"
                   <TextBlock Text="Pack:" VerticalAlignment="Center" FontWeight="Bold" Margin="0 0 8 0"/>
                   <ComboBox Name="InsightPackCombo" MinWidth="420" IsEditable="True" IsTextSearchEnabled="True"
                             ToolTip="Select an Insight Pack from insights/packs"/>
+                  <Button Name="RefreshInsightPacksButton" Width="80" Height="26" Margin="10 2 0 0" Content="Reload"
+                          ToolTip="Reload packs from disk (uses GENESYS_API_EXPLORER_PACKS_DIR when set)"/>
                 </StackPanel>
 
                 <WrapPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
@@ -5695,10 +5778,16 @@ $Xaml = @"
 	              </StackPanel>
 	            </Expander>
           </StackPanel>
-          <StackPanel Grid.Row="1" Margin="0 0 0 8">
-            <TextBlock Name="InsightEvidenceSummary" Text="Run an insight pack to surface the evidence narrative." TextWrapping="Wrap" Foreground="DarkSlateGray"/>
-            <TextBlock Name="InsightBriefingPathText" Text="Briefings folder will appear here after the first export." TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0 4 0 0"/>
-          </StackPanel>
+	          <!-- Use Grid instead of StackPanel so TextWrapping/Trimming measure against available width. -->
+	          <Grid Grid.Row="1" Margin="0 0 0 8">
+	            <Grid.RowDefinitions>
+	              <RowDefinition Height="Auto"/>
+	              <RowDefinition Height="Auto"/>
+	            </Grid.RowDefinitions>
+	            <TextBlock Grid.Row="0" Name="InsightEvidenceSummary" Text="Run an insight pack to surface the evidence narrative." TextWrapping="Wrap" Foreground="DarkSlateGray"/>
+	            <TextBlock Grid.Row="1" Name="InsightBriefingPathText" Text="Briefings folder will appear here after the first export."
+	                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Foreground="Gray" FontSize="11" Margin="0 4 0 0"/>
+	          </Grid>
           <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="2*"/>
@@ -5923,17 +6012,18 @@ $runPeakConcurrencyPackButton = $Window.FindName("RunPeakConcurrencyPackButton")
 $runMosMonthlyPackButton = $Window.FindName("RunMosMonthlyPackButton")
 $runSelectedInsightPackButton = $Window.FindName("RunSelectedInsightPackButton")
 $compareSelectedInsightPackButton = $Window.FindName("CompareSelectedInsightPackButton")
-$insightBaselineModeCombo = $Window.FindName("InsightBaselineModeCombo")
-$dryRunSelectedInsightPackButton = $Window.FindName("DryRunSelectedInsightPackButton")
-$useInsightCacheCheckbox = $Window.FindName("UseInsightCacheCheckbox")
-$strictInsightValidationCheckbox = $Window.FindName("StrictInsightValidationCheckbox")
-$insightCacheTtlInput = $Window.FindName("InsightCacheTtlInput")
-$insightPackCombo = $Window.FindName("InsightPackCombo")
-$insightPackDescriptionText = $Window.FindName("InsightPackDescriptionText")
-$insightPackMetaText = $Window.FindName("InsightPackMetaText")
-$insightPackWarningsText = $Window.FindName("InsightPackWarningsText")
-$insightPackParametersPanel = $Window.FindName("InsightPackParametersPanel")
-$insightTimePresetCombo = $Window.FindName("InsightTimePresetCombo")
+	$insightBaselineModeCombo = $Window.FindName("InsightBaselineModeCombo")
+	$dryRunSelectedInsightPackButton = $Window.FindName("DryRunSelectedInsightPackButton")
+	$useInsightCacheCheckbox = $Window.FindName("UseInsightCacheCheckbox")
+	$strictInsightValidationCheckbox = $Window.FindName("StrictInsightValidationCheckbox")
+	$insightCacheTtlInput = $Window.FindName("InsightCacheTtlInput")
+	$insightPackCombo = $Window.FindName("InsightPackCombo")
+	$refreshInsightPacksButton = $Window.FindName("RefreshInsightPacksButton")
+	$insightPackDescriptionText = $Window.FindName("InsightPackDescriptionText")
+	$insightPackMetaText = $Window.FindName("InsightPackMetaText")
+	$insightPackWarningsText = $Window.FindName("InsightPackWarningsText")
+	$insightPackParametersPanel = $Window.FindName("InsightPackParametersPanel")
+	$insightTimePresetCombo = $Window.FindName("InsightTimePresetCombo")
 $applyInsightTimePresetButton = $Window.FindName("ApplyInsightTimePresetButton")
 $insightPackExampleCombo = $Window.FindName("InsightPackExampleCombo")
 $loadInsightPackExampleButton = $Window.FindName("LoadInsightPackExampleButton")
@@ -6260,15 +6350,24 @@ function Get-InsightPackPath {
 }
 
 function Get-InsightBriefingDirectory {
-    if (-not $insightBriefingRoot) {
+    $targetDir = $insightBriefingRoot
+
+    if (-not $targetDir) {
         throw "Insight briefing root path is not configured."
     }
 
-    if (-not (Test-Path -LiteralPath $insightBriefingRoot)) {
-        New-Item -ItemType Directory -Path $insightBriefingRoot -Force | Out-Null
+    # If primary directory doesn't exist, try legacy location
+    if (-not (Test-Path -LiteralPath $targetDir) -and $legacyInsightBriefingRoot) {
+        if (Test-Path -LiteralPath $legacyInsightBriefingRoot) {
+            $targetDir = $legacyInsightBriefingRoot
+        }
     }
 
-    return $insightBriefingRoot
+    if (-not (Test-Path -LiteralPath $targetDir)) {
+        New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+    }
+
+    return $targetDir
 }
 
 function Update-InsightPackUi {
@@ -7529,35 +7628,47 @@ if ($openBriefingSnapshotButton) {
         })
 }
 
-Refresh-InsightBriefingHistory
+	Refresh-InsightBriefingHistory
+	
+	if (-not $script:InsightParamInputs) { $script:InsightParamInputs = @{} }
+	$script:InsightPackCatalog = @()
 
-if (-not $script:InsightParamInputs) { $script:InsightParamInputs = @{} }
-$script:InsightPackCatalog = @()
+	function Refresh-InsightPackCatalogUi {
+	    if (-not $insightPackCombo) { return }
+	    $script:InsightPackCatalog = @(Get-InsightPackCatalog -PackDirectory $insightPackRoot -LegacyPackDirectory $legacyInsightPackRoot)
+	    $insightPackCombo.ItemsSource = $script:InsightPackCatalog
+	    $insightPackCombo.DisplayMemberPath = 'Display'
 
-if ($insightPackCombo) {
-    $script:InsightPackCatalog = @(Get-InsightPackCatalog -PackDirectory $insightPackRoot -LegacyPackDirectory $legacyInsightPackRoot)
-    $insightPackCombo.ItemsSource = $script:InsightPackCatalog
-    $insightPackCombo.DisplayMemberPath = 'Display'
+	    $packExists = Test-Path -LiteralPath $insightPackRoot
+	    $legacyExists = Test-Path -LiteralPath $legacyInsightPackRoot
+	    $count = if ($script:InsightPackCatalog) { $script:InsightPackCatalog.Count } else { 0 }
 
-    if (-not $script:InsightPackCatalog -or $script:InsightPackCatalog.Count -eq 0) {
-        $packExists = Test-Path -LiteralPath $insightPackRoot
-        $legacyExists = Test-Path -LiteralPath $legacyInsightPackRoot
+	    if ($count -le 0) {
+	        $msg = "No insight packs found. Checked:`n- $insightPackRoot (exists=$packExists)`n- $legacyInsightPackRoot (exists=$legacyExists)"
+	        if ($insightPackDescriptionText) { $insightPackDescriptionText.Text = $msg }
+	        Add-LogEntry $msg
+	        Add-LogEntry "Insight pack discovery context: workspaceRoot=$workspaceRoot; scriptRoot=$ScriptRoot; override=$([string]$env:GENESYS_API_EXPLORER_PACKS_DIR)"
 
-        $msg = "No insight packs found. Checked:`n- $insightPackRoot (exists=$packExists)`n- $legacyInsightPackRoot (exists=$legacyExists)"
-        if ($insightPackDescriptionText) { $insightPackDescriptionText.Text = $msg }
-        Add-LogEntry $msg
+	        if ($script:InsightPackCatalogErrors -and $script:InsightPackCatalogErrors.Count -gt 0) {
+	            Add-LogEntry "Insight pack parse errors (first 3):"
+	            foreach ($line in @($script:InsightPackCatalogErrors | Select-Object -First 3)) {
+	                Add-LogEntry "  $line"
+	            }
+	        }
+	    }
+	    else {
+	        if ($insightPackDescriptionText) {
+	            $insightPackDescriptionText.Text = "Loaded $count pack(s) from:`n- $insightPackRoot`n- $legacyInsightPackRoot"
+	        }
+	    }
+	}
 
-        if ($script:InsightPackCatalogErrors -and $script:InsightPackCatalogErrors.Count -gt 0) {
-            Add-LogEntry "Insight pack parse errors (first 3):"
-            foreach ($line in @($script:InsightPackCatalogErrors | Select-Object -First 3)) {
-                Add-LogEntry "  $line"
-            }
-        }
-    }
+	if ($insightPackCombo) {
+	    Refresh-InsightPackCatalogUi
 
-    $insightPackCombo.Add_SelectionChanged({
-            $selected = $insightPackCombo.SelectedItem
-            if (-not $selected) { return }
+	    $insightPackCombo.Add_SelectionChanged({
+	            $selected = $insightPackCombo.SelectedItem
+	            if (-not $selected) { return }
 
             if ($insightPackDescriptionText) {
                 $insightPackDescriptionText.Text = if ($selected.Description) { $selected.Description } else { $selected.Id }
@@ -7713,8 +7824,14 @@ if ($applyInsightTimePresetButton) {
             catch {
                 Add-LogEntry "Failed to apply time preset: $($_.Exception.Message)"
             }
-        })
-}
+	        })
+	}
+
+	if ($refreshInsightPacksButton) {
+	    $refreshInsightPacksButton.Add_Click({
+	            Refresh-InsightPackCatalogUi
+	        })
+	}
 
 if ($loadInsightPackExampleButton) {
     $loadInsightPackExampleButton.Add_Click({
