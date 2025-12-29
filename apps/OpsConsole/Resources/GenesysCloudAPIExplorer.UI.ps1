@@ -2536,6 +2536,21 @@ function Add-InspectorTreeNode {
     $Tree.Items.Add($node) | Out-Null
 }
 
+function Populate-InspectorTree {
+    param(
+        [Parameter(Mandatory)]
+        $Tree,
+
+        [Parameter(Mandatory)]
+        $Data,
+
+        [Parameter()]
+        [string]$Label = 'root'
+    )
+
+    Add-InspectorTreeNode -Tree $Tree -Data $Data -Label $Label -Depth 0
+}
+
 function Show-DataInspector {
     param ([string]$JsonText)
 
