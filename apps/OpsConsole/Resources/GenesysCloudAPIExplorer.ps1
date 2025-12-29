@@ -5021,7 +5021,7 @@ function Save-TemplatesToDisk {
     }
 }
 
-$script:BlockedTemplateMethods = @('DELETE', 'PATCH')
+$script:BlockedTemplateMethods = @('DELETE', 'PATCH', 'PUT')
 
 function Test-TemplateMethodAllowed {
     param([string]$Method)
