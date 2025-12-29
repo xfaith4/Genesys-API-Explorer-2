@@ -78,12 +78,21 @@ function Get-InsightPackCatalog {
     $items = New-Object System.Collections.Generic.List[object]
     $script:InsightPackCatalogErrors = New-Object System.Collections.Generic.List[string]
     foreach ($dir in $dirs) {
-        Get-ChildItem -Path $dir -Filter '*.json' -File -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object {
-            $packPath = $_.FullName
+        $files = @()
+        try {
+            $files = @(Get-ChildItem -LiteralPath $dir -File -ErrorAction Stop | Where-Object { $_.Extension -eq '.json' } | Sort-Object Name)
+        }
+        catch {
+            try { $script:InsightPackCatalogErrors.Add("$dir :: $($_.Exception.Message)") | Out-Null } catch { }
+            continue
+        }
+
+        foreach ($file in $files) {
+            $packPath = $file.FullName
             try {
                 $raw = Get-Content -LiteralPath $packPath -Raw -Encoding utf8
                 $pack = $raw | ConvertFrom-Json
-                if (-not $pack -or -not $pack.id) { return }
+                if (-not $pack -or -not $pack.id) { continue }
 
                 $examples = @()
                 if ($pack -and ($pack.PSObject.Properties.Name -contains 'examples') -and $pack.examples) {
@@ -123,14 +132,13 @@ function Get-InsightPackCatalog {
                         }
                     ) | Where-Object { $_ }
                     Examples    = $examples
-                    FileName    = $_.Name
-                    FullPath    = $_.FullName
+                    FileName    = $file.Name
+                    FullPath    = $file.FullName
                     Pack        = $pack
                     Display     = if ($pack.name) { "$($pack.name)  [$($pack.id)]" } else { [string]$pack.id }
                 }) | Out-Null
             }
             catch {
-                # ignore malformed packs; they should still be runnable by path if needed
                 try { $script:InsightPackCatalogErrors.Add("$packPath :: $($_.Exception.Message)") | Out-Null } catch { }
             }
         }
