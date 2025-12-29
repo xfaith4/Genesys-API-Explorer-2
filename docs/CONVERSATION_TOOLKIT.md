@@ -489,6 +489,26 @@ The resulting Excel briefing includes:
 - A summary table grouped by queue
 - A summary table grouped by division
 
+### Workflow 7: Monthly MOS + WebRTC Error % (By Division)
+
+For a high-value end-of-month report (average MOS + % degraded + % WebRTC error conversations by division), run:
+
+```powershell
+Import-Module src/GenesysCloud.OpsInsights/GenesysCloud.OpsInsights.psd1 -Force
+Connect-GCCloud -RegionDomain 'usw2.pure.cloud' -AccessToken $token | Out-Null
+
+$result = Invoke-GCInsightPack -PackPath 'gc.mos.monthly.byDivision.v1.json' -Parameters @{
+  # Use month boundaries for an end-of-month report
+  startDate = '2025-12-01T00:00:00Z'
+  endDate   = '2026-01-01T00:00:00Z'
+
+  degradedMosThreshold = 3.5
+  webrtcErrorCodeRegex = 'webrtc|ice|stun|turn|rtp|media'
+}
+
+Export-GCInsightBriefing -Result $result -Directory (Join-Path $PWD 'briefings') -Force
+```
+
 ### Workflow 4: MediaEndpointStats Quality Analysis
 
 ```powershell

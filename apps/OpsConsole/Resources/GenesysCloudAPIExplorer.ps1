@@ -554,6 +554,248 @@ function ConvertTo-FormEncodedString {
     return ($pairs -join '&')
 }
 
+function Get-ExplorerSettingsPath {
+    $base = if ($env:USERPROFILE) { $env:USERPROFILE } else { $ScriptRoot }
+    return (Join-Path -Path $base -ChildPath 'GenesysApiExplorer.settings.json')
+}
+
+function Load-ExplorerSettings {
+    $path = Get-ExplorerSettingsPath
+    if (-not (Test-Path -LiteralPath $path)) { return @{} }
+    try {
+        $raw = Get-Content -LiteralPath $path -Raw
+        if ([string]::IsNullOrWhiteSpace($raw)) { return @{} }
+        $obj = $raw | ConvertFrom-Json -ErrorAction Stop
+        $settings = @{}
+        foreach ($p in $obj.PSObject.Properties) {
+            $settings[$p.Name] = $p.Value
+        }
+        return $settings
+    }
+    catch {
+        return @{}
+    }
+}
+
+function Save-ExplorerSettings {
+    param([hashtable]$Settings)
+    try {
+        $path = Get-ExplorerSettingsPath
+        ($Settings | ConvertTo-Json) | Set-Content -LiteralPath $path -Encoding utf8
+    }
+    catch { }
+}
+
+$script:Region = 'mypurecloud.com'
+$script:AccessToken = ''
+$script:OAuthType = '(none)'
+$script:TokenValidated = $false
+
+function Set-ExplorerRegion {
+    param([Parameter(Mandatory)][string]$Region)
+
+    $regionValue = $Region.Trim()
+    if ($regionValue -notin @('mypurecloud.com', 'usw2.pure.cloud')) {
+        $regionValue = 'mypurecloud.com'
+    }
+
+    $script:Region = $regionValue
+    $script:TokenValidated = $false
+    Set-Variable -Name ApiBaseUrl -Scope Script -Value ("https://api.$regionValue")
+}
+
+try {
+    $saved = Load-ExplorerSettings
+    if ($saved -and $saved.ContainsKey('Region') -and $saved.Region) {
+        Set-ExplorerRegion -Region ([string]$saved.Region)
+    }
+    else {
+        Set-ExplorerRegion -Region $script:Region
+    }
+}
+catch {
+    Set-ExplorerRegion -Region $script:Region
+}
+
+function Set-ExplorerAccessToken {
+    param(
+        [string]$Token,
+        [string]$OAuthType
+    )
+
+    $tokenValue = if ($Token) { $Token.Trim() } else { '' }
+    $script:AccessToken = $tokenValue
+    $script:TokenValidated = $false
+
+    if ([string]::IsNullOrWhiteSpace($tokenValue)) {
+        $script:OAuthType = '(none)'
+    }
+    else {
+        $script:OAuthType = if ($OAuthType) { $OAuthType } else { 'Manual' }
+    }
+}
+
+function Get-ExplorerAccessToken {
+    if ($script:AccessToken) { return $script:AccessToken.Trim() }
+    return ''
+}
+
+function Update-AuthUiState {
+    if ($regionStatusText) { $regionStatusText.Text = "Region: $($script:Region)" }
+    if ($oauthTypeText) { $oauthTypeText.Text = "OAuth: $($script:OAuthType)" }
+
+    $hasToken = -not [string]::IsNullOrWhiteSpace((Get-ExplorerAccessToken))
+    if ($tokenReadyIndicator) {
+        $tokenReadyIndicator.Text = if ($script:TokenValidated) { '●' } else { '●' }
+        $tokenReadyIndicator.Foreground = if (-not $hasToken) { 'Gray' } elseif ($script:TokenValidated) { 'Green' } else { 'Orange' }
+        $tokenReadyIndicator.ToolTip = if (-not $hasToken) { 'No token set' } elseif ($script:TokenValidated) { 'Token validated' } else { 'Token set (not validated)' }
+    }
+
+    if ($tokenStatusText) {
+        if (-not $hasToken) {
+            $tokenStatusText.Text = 'No token'
+            $tokenStatusText.Foreground = 'Gray'
+        }
+        elseif ($script:TokenValidated) {
+            $tokenStatusText.Text = '✓ Valid'
+            $tokenStatusText.Foreground = 'Green'
+        }
+        else {
+            $tokenStatusText.Text = 'Token set'
+            $tokenStatusText.Foreground = 'Orange'
+        }
+    }
+}
+
+function Show-AppSettingsDialog {
+    param(
+        [string]$CurrentRegion,
+        [string]$CurrentOAuthType,
+        [string]$CurrentToken
+    )
+
+    $settingsXaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="App Settings" Height="360" Width="760"
+        MinHeight="340" MinWidth="640"
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid Margin="20">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="Application Settings" FontSize="14" FontWeight="Bold" Margin="0 0 0 12"/>
+
+    <StackPanel Grid.Row="1" Margin="0 0 0 12">
+      <TextBlock Text="Region" FontWeight="Bold" Margin="0 0 0 6"/>
+      <ComboBox Name="RegionCombo" Height="28" SelectedIndex="0">
+        <ComboBoxItem Content="mypurecloud.com"/>
+        <ComboBoxItem Content="usw2.pure.cloud"/>
+      </ComboBox>
+      <TextBlock Text="This controls the API base URL, exported PowerShell, and exported cURL." Foreground="Gray" FontSize="11" Margin="0 6 0 0"/>
+    </StackPanel>
+
+    <StackPanel Grid.Row="2" Margin="0 0 0 12">
+      <TextBlock Text="OAuth Token" FontWeight="Bold" Margin="0 0 0 6"/>
+      <TextBox Name="TokenText" Height="60" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+               ToolTip="Paste a Genesys Cloud OAuth access token (Bearer)."/>
+      <TextBlock Text="Token is stored in memory only (not written to disk)." Foreground="Gray" FontSize="11" Margin="0 6 0 0"/>
+    </StackPanel>
+
+    <StackPanel Grid.Row="3" Orientation="Horizontal" VerticalAlignment="Top">
+      <TextBlock Text="OAuth Type:" FontWeight="Bold" VerticalAlignment="Center" Margin="0 0 8 0"/>
+      <TextBlock Name="OAuthTypeValue" VerticalAlignment="Center" Foreground="SlateGray" Margin="0 0 16 0"/>
+      <Button Name="ClearTokenButton" Width="120" Height="28" Content="Clear Token"/>
+    </StackPanel>
+
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 20 0 0">
+      <Button Name="ApplyButton" Content="Apply" Width="100" Height="32" Margin="0 0 10 0"/>
+      <Button Name="CancelButton" Content="Cancel" Width="100" Height="32"/>
+    </StackPanel>
+  </Grid>
+</Window>
+"@
+
+    $win = [System.Windows.Markup.XamlReader]::Parse($settingsXaml)
+    if (-not $win) { return $null }
+    if ($Window) { $win.Owner = $Window }
+
+    $regionCombo = $win.FindName('RegionCombo')
+    $tokenText = $win.FindName('TokenText')
+    $oauthTypeValue = $win.FindName('OAuthTypeValue')
+    $clearTokenButton = $win.FindName('ClearTokenButton')
+    $applyButton = $win.FindName('ApplyButton')
+    $cancelButton = $win.FindName('CancelButton')
+
+    if ($tokenText) { $tokenText.Text = $CurrentToken }
+    if ($oauthTypeValue) { $oauthTypeValue.Text = if ($CurrentOAuthType) { $CurrentOAuthType } else { '(none)' } }
+
+    if ($regionCombo -and $CurrentRegion) {
+        $idx = -1
+        foreach ($item in $regionCombo.Items) {
+            $idx++
+            if ($item.Content -eq $CurrentRegion) { $regionCombo.SelectedIndex = $idx; break }
+        }
+    }
+
+    if ($clearTokenButton) {
+        $clearTokenButton.Add_Click({
+            if ($tokenText) { $tokenText.Text = '' }
+            if ($oauthTypeValue) { $oauthTypeValue.Text = '(none)' }
+        })
+    }
+
+    if ($tokenText) {
+        $tokenText.Add_TextChanged({
+            $txt = $tokenText.Text
+            if ([string]::IsNullOrWhiteSpace($txt)) {
+                if ($oauthTypeValue) { $oauthTypeValue.Text = '(none)' }
+            }
+            else {
+                if ($oauthTypeValue) { $oauthTypeValue.Text = 'Manual' }
+            }
+        })
+    }
+
+    $result = $null
+    if ($applyButton) {
+        $applyButton.Add_Click({
+            $regionValue = 'mypurecloud.com'
+            if ($regionCombo -and $regionCombo.SelectedItem) {
+                $regionValue = $regionCombo.SelectedItem.Content.ToString().Trim()
+            }
+            $tokenValue = if ($tokenText) { $tokenText.Text } else { '' }
+            $oauthType = if ($oauthTypeValue) { $oauthTypeValue.Text } else { '(none)' }
+
+            $script:AppSettingsDialogResult = [pscustomobject]@{
+                Region    = $regionValue
+                Token     = $tokenValue
+                OAuthType = $oauthType
+            }
+            $win.DialogResult = $true
+            $win.Close()
+        })
+    }
+
+    if ($cancelButton) {
+        $cancelButton.Add_Click({
+            $win.DialogResult = $false
+            $win.Close()
+        })
+    }
+
+    $script:AppSettingsDialogResult = $null
+    $win.ShowDialog() | Out-Null
+    if ($win.DialogResult) { return $script:AppSettingsDialogResult }
+    return $null
+}
+
 function Show-LoginWindow {
     $loginXaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -648,6 +890,8 @@ function Show-LoginWindow {
     }
 
     $script:LoginResult = $null
+    $script:LastLoginOAuthType = $null
+    $script:LastLoginRegion = $null
 
     # --- Client Credentials Flow ---
     $clientLoginButton.Add_Click({
@@ -675,6 +919,8 @@ function Show-LoginWindow {
 
                 if ($response.access_token) {
                     $script:LoginResult = $response.access_token
+                    $script:LastLoginOAuthType = 'Client Credentials'
+                    $script:LastLoginRegion = $regionText
 
                     # Save settings
                     $savedSettings.ClientClientId = $clientId
@@ -762,6 +1008,8 @@ function Show-LoginWindow {
 
                             if ($response.access_token) {
                                 $script:LoginResult = $response.access_token
+                                $script:LastLoginOAuthType = 'User PKCE'
+                                $script:LastLoginRegion = $regionText
                                 $loginWindow.Close()
                             }
                         }
@@ -2651,7 +2899,7 @@ function Get-ConversationReport {
         [string]$ConversationId,
         [Parameter(Mandatory = $true)]
         [hashtable]$Headers,
-        [string]$BaseUrl = "https://api.usw2.pure.cloud",
+        [string]$BaseUrl = "https://api.mypurecloud.com",
         [scriptblock]$ProgressCallback = $null
     )
 
@@ -4441,7 +4689,7 @@ function Format-ConversationReportText {
     return $sb.ToString()
 }
 
-$ApiBaseUrl = "https://api.usw2.pure.cloud"
+$ApiBaseUrl = "https://api.$($script:Region)"
 $JobTracker = [PSCustomObject]@{
     Timer      = $null
     JobId      = $null
@@ -4694,11 +4942,120 @@ function Save-TemplatesToDisk {
     )
 
     try {
-        $Templates | ConvertTo-Json -Depth 5 | Set-Content -Path $Path -Encoding utf8
+        $normalized = @($Templates | Where-Object { $_ } | ForEach-Object { $_ })
+        $normalized | ConvertTo-Json -Depth 5 | Set-Content -Path $Path -Encoding utf8
     }
     catch {
         Write-Warning "Unable to save templates: $($_.Exception.Message)"
     }
+}
+
+$script:BlockedTemplateMethods = @('DELETE', 'PATCH')
+
+function Test-TemplateMethodAllowed {
+    param([string]$Method)
+
+    if ([string]::IsNullOrWhiteSpace($Method)) { return $true }
+    return (-not ($script:BlockedTemplateMethods -contains $Method.Trim().ToUpperInvariant()))
+}
+
+function Normalize-TemplateObject {
+    param(
+        [Parameter(Mandatory)]
+        $Template,
+        [string]$DefaultLastModified
+    )
+
+    if (-not $Template) { return $null }
+
+    $method = ''
+    try { $method = [string]$Template.Method } catch { $method = '' }
+    if (-not (Test-TemplateMethodAllowed -Method $method)) { return $null }
+
+    $created = ''
+    $lastModified = ''
+    try { $created = [string]$Template.Created } catch { $created = '' }
+    try { $lastModified = [string]$Template.LastModified } catch { $lastModified = '' }
+
+    if ([string]::IsNullOrWhiteSpace($created)) {
+        $created = if ($DefaultLastModified) { $DefaultLastModified } else { (Get-Date).ToString('yyyy-MM-dd HH:mm:ss') }
+    }
+    if ([string]::IsNullOrWhiteSpace($lastModified)) {
+        $lastModified = $created
+    }
+
+    $templateOut = [pscustomobject]@{
+        Name         = [string]$Template.Name
+        Method       = [string]$Template.Method
+        Path         = [string]$Template.Path
+        Group        = [string]$Template.Group
+        Parameters   = $Template.Parameters
+        Created      = $created
+        LastModified = $lastModified
+    }
+
+    return $templateOut
+}
+
+function Normalize-Templates {
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.IEnumerable]$Templates,
+        [string]$DefaultLastModified
+    )
+
+    $out = New-Object System.Collections.Generic.List[object]
+    foreach ($t in @($Templates)) {
+        $norm = Normalize-TemplateObject -Template $t -DefaultLastModified $DefaultLastModified
+        if ($norm) { $out.Add($norm) | Out-Null }
+    }
+    return @($out)
+}
+
+function Enable-GridViewColumnSorting {
+    param(
+        [Parameter(Mandatory)]
+        [System.Windows.Controls.ListView]$ListView,
+        [hashtable]$State
+    )
+
+    if (-not $State) { $State = @{} }
+    if (-not $State.ContainsKey('Property')) { $State.Property = $null }
+    if (-not $State.ContainsKey('Direction')) { $State.Direction = [System.ComponentModel.ListSortDirection]::Ascending }
+
+    $ListView.AddHandler(
+        [System.Windows.Controls.GridViewColumnHeader]::ClickEvent,
+        [System.Windows.RoutedEventHandler]{
+            param($sender, $e)
+
+            $header = $e.OriginalSource
+            if (-not ($header -is [System.Windows.Controls.GridViewColumnHeader])) { return }
+            if (-not $header.Tag) { return }
+
+            $sortBy = [string]$header.Tag
+            if ([string]::IsNullOrWhiteSpace($sortBy)) { return }
+
+            $direction = [System.ComponentModel.ListSortDirection]::Ascending
+            if ($State.Property -eq $sortBy) {
+                $direction = if ($State.Direction -eq [System.ComponentModel.ListSortDirection]::Ascending) {
+                    [System.ComponentModel.ListSortDirection]::Descending
+                }
+                else {
+                    [System.ComponentModel.ListSortDirection]::Ascending
+                }
+            }
+
+            $State.Property = $sortBy
+            $State.Direction = $direction
+
+            $view = [System.ComponentModel.CollectionViewSource]::GetDefaultView($sender.ItemsSource)
+            if (-not $view) { return }
+
+            $view.SortDescriptions.Clear()
+            $view.SortDescriptions.Add((New-Object System.ComponentModel.SortDescription($sortBy, $direction)))
+            $view.Refresh()
+        }
+    )
 }
 
 $script:LastResponseText = ""
@@ -4736,11 +5093,52 @@ function Join-FromScriptRoot {
     return Join-Path -Path $base -ChildPath $Child
 }
 
-$insightPackRoot = Join-FromScriptRoot -Levels 3 -Child 'insights/packs'
-$legacyInsightPackRoot = Join-FromScriptRoot -Levels 3 -Child 'insightpacks'
-$insightBriefingRoot = Join-FromScriptRoot -Levels 3 -Child 'insights/briefings'
-$legacyInsightBriefingRoot = Join-FromScriptRoot -Levels 3 -Child 'InsightBriefings'
-$script:OpsInsightsManifest = Join-FromScriptRoot -Levels 3 -Child 'src/GenesysCloud.OpsInsights/GenesysCloud.OpsInsights.psd1'
+function Resolve-WorkspaceRoot {
+    param(
+        [string[]]$StartDirectories
+    )
+
+    foreach ($start in @($StartDirectories)) {
+        if ([string]::IsNullOrWhiteSpace($start)) { continue }
+        try {
+            $item = Get-Item -LiteralPath $start -ErrorAction SilentlyContinue
+            if (-not $item) { continue }
+            $current = if ($item.PSIsContainer) { $item.FullName } else { Split-Path -Parent $item.FullName }
+            for ($i = 0; $i -lt 8; $i++) {
+                $packs = Join-Path -Path $current -ChildPath 'insights/packs'
+                if (Test-Path -LiteralPath $packs) { return $current }
+
+                $parent = Split-Path -Parent $current
+                if (-not $parent -or ($parent -eq $current)) { break }
+                $current = $parent
+            }
+        }
+        catch { }
+    }
+
+    return $null
+}
+
+$candidateRoots = @(
+    $env:GENESYS_API_EXPLORER_ROOT,
+    $ScriptRoot,
+    (Get-Location).Path,
+    $PSCommandPath,
+    $MyInvocation.MyCommand.Path,
+    [AppDomain]::CurrentDomain.BaseDirectory
+)
+
+$workspaceRoot = Resolve-WorkspaceRoot -StartDirectories $candidateRoots
+if (-not $workspaceRoot) {
+    # Fallback to the original assumption (script lives under apps/OpsConsole/Resources)
+    $workspaceRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ScriptRoot))
+}
+
+$insightPackRoot = Join-Path -Path $workspaceRoot -ChildPath 'insights/packs'
+$legacyInsightPackRoot = Join-Path -Path $workspaceRoot -ChildPath 'insightpacks'
+$insightBriefingRoot = Join-Path -Path $workspaceRoot -ChildPath 'insights/briefings'
+$legacyInsightBriefingRoot = Join-Path -Path $workspaceRoot -ChildPath 'InsightBriefings'
+$script:OpsInsightsManifest = Join-Path -Path $workspaceRoot -ChildPath 'src/GenesysCloud.OpsInsights/GenesysCloud.OpsInsights.psd1'
 $script:OpsInsightsModuleRoot = Split-Path -Parent $script:OpsInsightsManifest
 $script:OpsInsightsCoreManifest = Join-Path -Path $script:OpsInsightsModuleRoot -ChildPath '..\GenesysCloud.OpsInsights.Core\GenesysCloud.OpsInsights.Core.psd1'
 
@@ -4798,11 +5196,7 @@ function Ensure-OpsInsightsModuleLoaded {
 }
 
 function Ensure-OpsInsightsContext {
-    if (-not $tokenBox) {
-        throw "OAuth token input control is not available."
-    }
-
-    $token = $tokenBox.Text
+    $token = Get-ExplorerAccessToken
     if ([string]::IsNullOrWhiteSpace($token)) {
         throw "Please provide an OAuth token before running Insight Packs."
     }
@@ -4896,6 +5290,8 @@ $Xaml = @"
   <DockPanel LastChildFill="True">
     <Menu DockPanel.Dock="Top">
       <MenuItem Header="_Settings">
+        <MenuItem Name="AppSettingsMenuItem" Header="App Settings..."/>
+        <Separator/>
         <MenuItem Name="SettingsMenuItem" Header="Endpoints Configuration"/>
         <Separator/>
         <MenuItem Name="ResetEndpointsMenuItem" Header="Reset to Default"/>
@@ -4907,11 +5303,11 @@ $Xaml = @"
         <MenuItem Name="HelpSupportLink" Header="Genesys Support"/>
       </MenuItem>
     </Menu>
-	    <Grid Margin="10">
-	    <Grid.RowDefinitions>
-	      <RowDefinition Height="Auto"/>
-	      <RowDefinition Height="Auto"/>
-	      <RowDefinition Height="Auto"/>
+		    <Grid Margin="10">
+		    <Grid.RowDefinitions>
+		      <RowDefinition Height="Auto"/>
+		      <RowDefinition Height="Auto"/>
+		      <RowDefinition Height="Auto"/>
 	      <RowDefinition Height="Auto"/>
 	      <RowDefinition Height="Auto"/>
 	      <RowDefinition Height="Auto"/>
@@ -4919,20 +5315,26 @@ $Xaml = @"
 	      <RowDefinition Height="*"/>
 	    </Grid.RowDefinitions>
 
-    <TextBlock Grid.Row="0" Text="Genesys Cloud API Explorer" FontSize="20" FontWeight="Bold" Margin="0 0 0 10"/>
+	    <Grid Grid.Row="0" Margin="0 0 0 10">
+	      <Grid.ColumnDefinitions>
+	        <ColumnDefinition Width="*"/>
+	        <ColumnDefinition Width="Auto"/>
+	      </Grid.ColumnDefinitions>
+	      <TextBlock Grid.Column="0" Text="Genesys Cloud API Explorer" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+	      <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+	        <TextBlock Name="RegionStatusText" VerticalAlignment="Center" Foreground="SlateGray" Margin="0 0 10 0" Text="Region: (unset)"/>
+	        <TextBlock Name="OauthTypeText" VerticalAlignment="Center" Foreground="SlateGray" Margin="0 0 10 0" Text="OAuth: (none)"/>
+	        <Button Name="LoginButton" Width="90" Height="28" Content="Login..." Margin="0 0 10 0" Background="#E0E0FF"/>
+	        <Button Name="TestTokenButton" Width="95" Height="28" Content="Test Token" Margin="0 0 10 0" ToolTip="Verify token validity"/>
+	        <TextBlock Name="TokenReadyIndicator" VerticalAlignment="Center" Foreground="Gray" FontSize="16" Margin="0 0 10 0" Text="●"/>
+	        <TextBlock Name="TokenStatusText" VerticalAlignment="Center" Foreground="Gray" Text="No token"/>
+	      </StackPanel>
+	    </Grid>
 
-    <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0 0 0 10">
-      <TextBlock Text="OAuth Token:" VerticalAlignment="Center" Margin="0 0 5 0"/>
-      <TextBox Name="TokenInput" Width="400" Margin="0 0 10 0" ToolTip="Paste your Genesys Cloud OAuth token here."/>
-      <Button Name="LoginButton" Width="80" Height="26" Content="Login..." Margin="0 0 10 0" Background="#E0E0FF"/>
-      <Button Name="TestTokenButton" Width="90" Height="26" Content="Test Token" Margin="0 0 10 0" ToolTip="Verify token validity"/>
-      <TextBlock Name="TokenStatusText" VerticalAlignment="Center" Foreground="Gray" Text="Not tested"/>
-    </StackPanel>
-
-	    <Grid Grid.Row="2" Name="RequestSelectorGrid" Margin="0 0 0 10">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="*"/>
+		    <Grid Grid.Row="2" Name="RequestSelectorGrid" Margin="0 0 0 10">
+	      <Grid.ColumnDefinitions>
+	        <ColumnDefinition Width="*"/>
+	        <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="*"/>
       </Grid.ColumnDefinitions>
 
@@ -5256,14 +5658,15 @@ $Xaml = @"
               </Grid>
             </GroupBox>
 
-            <Expander Header="Quick Packs" IsExpanded="False">
-              <StackPanel Orientation="Horizontal" Margin="10 6 0 0">
-                <Button Name="RunQueueSmokePackButton" Width="200" Height="30" Content="Queue Smoke Detector" Margin="0 0 10 0"/>
-                <Button Name="RunDataActionsPackButton" Width="200" Height="30" Content="Data Action Failures" Margin="0 0 10 0"/>
-                <Button Name="RunDataActionsEnrichedPackButton" Width="220" Height="30" Content="Data Actions (Enriched)" Margin="0 0 10 0"/>
-                <Button Name="RunPeakConcurrencyPackButton" Width="220" Height="30" Content="Peak Concurrency (Voice)"/>
-              </StackPanel>
-            </Expander>
+	            <Expander Header="Quick Packs" IsExpanded="False">
+	              <StackPanel Orientation="Horizontal" Margin="10 6 0 0">
+	                <Button Name="RunQueueSmokePackButton" Width="200" Height="30" Content="Queue Smoke Detector" Margin="0 0 10 0"/>
+	                <Button Name="RunDataActionsPackButton" Width="200" Height="30" Content="Data Action Failures" Margin="0 0 10 0"/>
+	                <Button Name="RunDataActionsEnrichedPackButton" Width="220" Height="30" Content="Data Actions (Enriched)" Margin="0 0 10 0"/>
+	                <Button Name="RunPeakConcurrencyPackButton" Width="220" Height="30" Content="Peak Concurrency (Voice)" Margin="0 0 10 0"/>
+	                <Button Name="RunMosMonthlyPackButton" Width="260" Height="30" Content="Monthly MOS (By Division)"/>
+	              </StackPanel>
+	            </Expander>
           </StackPanel>
           <StackPanel Grid.Row="1" Margin="0 0 0 8">
             <TextBlock Name="InsightEvidenceSummary" Text="Run an insight pack to surface the evidence narrative." TextWrapping="Wrap" Foreground="DarkSlateGray"/>
@@ -5336,10 +5739,31 @@ $Xaml = @"
                     VirtualizingStackPanel.VirtualizationMode="Recycling">
             <ListView.View>
               <GridView>
-                <GridViewColumn Header="Name" DisplayMemberBinding="{Binding Name}" Width="200"/>
-                <GridViewColumn Header="Method" DisplayMemberBinding="{Binding Method}" Width="70"/>
-                <GridViewColumn Header="Path" DisplayMemberBinding="{Binding Path}" Width="300"/>
-                <GridViewColumn Header="Created" DisplayMemberBinding="{Binding Created}" Width="150"/>
+                <GridViewColumn DisplayMemberBinding="{Binding Name}" Width="200">
+                  <GridViewColumn.Header>
+                    <GridViewColumnHeader Content="Name" Tag="Name"/>
+                  </GridViewColumn.Header>
+                </GridViewColumn>
+                <GridViewColumn DisplayMemberBinding="{Binding Method}" Width="80">
+                  <GridViewColumn.Header>
+                    <GridViewColumnHeader Content="Method" Tag="Method"/>
+                  </GridViewColumn.Header>
+                </GridViewColumn>
+                <GridViewColumn DisplayMemberBinding="{Binding Path}" Width="280">
+                  <GridViewColumn.Header>
+                    <GridViewColumnHeader Content="Path" Tag="Path"/>
+                  </GridViewColumn.Header>
+                </GridViewColumn>
+                <GridViewColumn DisplayMemberBinding="{Binding Created}" Width="150">
+                  <GridViewColumn.Header>
+                    <GridViewColumnHeader Content="Created" Tag="Created"/>
+                  </GridViewColumn.Header>
+                </GridViewColumn>
+                <GridViewColumn DisplayMemberBinding="{Binding LastModified}" Width="160">
+                  <GridViewColumn.Header>
+                    <GridViewColumnHeader Content="Last Modified" Tag="LastModified"/>
+                  </GridViewColumn.Header>
+                </GridViewColumn>
               </GridView>
             </ListView.View>
           </ListView>
@@ -5418,13 +5842,17 @@ $btnSubmit = $Window.FindName("SubmitButton")
 $btnSave = $Window.FindName("SaveButton")
 $responseBox = $Window.FindName("ResponseText")
 $logBox = $Window.FindName("LogText")
-$tokenBox = $Window.FindName("TokenInput")
 $loginButton = $Window.FindName("LoginButton")
 $testTokenButton = $Window.FindName("TestTokenButton")
 $tokenStatusText = $Window.FindName("TokenStatusText")
+$tokenReadyIndicator = $Window.FindName("TokenReadyIndicator")
+$regionStatusText = $Window.FindName("RegionStatusText")
+$oauthTypeText = $Window.FindName("OauthTypeText")
 $progressIndicator = $Window.FindName("ProgressIndicator")
 $statusText = $Window.FindName("StatusText")
 $favoritesList = $Window.FindName("FavoritesList")
+
+Update-AuthUiState
 $favoriteNameInput = $Window.FindName("FavoriteNameInput")
 $saveFavoriteButton = $Window.FindName("SaveFavoriteButton")
 $schemaList = $Window.FindName("SchemaList")
@@ -5449,6 +5877,7 @@ $conversationReportStatus = $Window.FindName("ConversationReportStatus")
 $conversationReportProgressBar = $Window.FindName("ConversationReportProgressBar")
 $conversationReportProgressText = $Window.FindName("ConversationReportProgressText")
 $conversationReportEndpointLog = $Window.FindName("ConversationReportEndpointLog")
+$appSettingsMenuItem = $Window.FindName("AppSettingsMenuItem")
 $settingsMenuItem = $Window.FindName("SettingsMenuItem")
 $exportLogButton = $Window.FindName("ExportLogButton")
 $clearLogButton = $Window.FindName("ClearLogButton")
@@ -5464,6 +5893,7 @@ $actionButtonsPanel = $Window.FindName("ActionButtonsPanel")
  $runDataActionsPackButton = $Window.FindName("RunDataActionsPackButton")
  $runDataActionsEnrichedPackButton = $Window.FindName("RunDataActionsEnrichedPackButton")
  $runPeakConcurrencyPackButton = $Window.FindName("RunPeakConcurrencyPackButton")
+ $runMosMonthlyPackButton = $Window.FindName("RunMosMonthlyPackButton")
  $runSelectedInsightPackButton = $Window.FindName("RunSelectedInsightPackButton")
  $compareSelectedInsightPackButton = $Window.FindName("CompareSelectedInsightPackButton")
  $insightBaselineModeCombo = $Window.FindName("InsightBaselineModeCombo")
@@ -5867,30 +6297,35 @@ function Run-InsightPackWorkflow {
         [string]$Label,
 
         [Parameter(Mandatory)]
-        [string]$FileName
+        [string]$FileName,
+
+        [Parameter()]
+        [string]$TimePresetKey
     )
 
-    $packPath = Get-InsightPackPath -FileName $FileName
-    if (-not (Test-Path -LiteralPath $packPath)) {
-        [System.Windows.MessageBox]::Show("Insight pack not found: $packPath", "Insight Pack", "OK", "Error")
-        return
-    }
-
-    if ($runQueueSmokePackButton) { $runQueueSmokePackButton.IsEnabled = $false }
-    if ($runDataActionsPackButton) { $runDataActionsPackButton.IsEnabled = $false }
-    $statusText.Text = "Running insight pack: $Label..."
-
     try {
-        Ensure-OpsInsightsModuleLoaded
-        Ensure-OpsInsightsContext
-        $result = Invoke-GCInsightPack -PackPath $packPath
-        $script:LastInsightResult = $result
-        Update-InsightPackUi -Result $result
-        if ($exportInsightBriefingButton) {
-            $exportInsightBriefingButton.IsEnabled = $true
+        # Prefer selecting the pack in the UI so parameter controls exist and start/end can be applied.
+        if ($insightPackCombo -and $script:InsightPackCatalog -and $script:InsightPackCatalog.Count -gt 0) {
+            $target = @($script:InsightPackCatalog | Where-Object { $_.FileName -eq $FileName } | Select-Object -First 1)
+            if ($target) {
+                $insightPackCombo.SelectedItem = $target
+            }
         }
+
+        if ($TimePresetKey) {
+            try { Apply-InsightTimePresetToUi -PresetKey $TimePresetKey } catch { }
+        }
+
+        if ($runQueueSmokePackButton) { $runQueueSmokePackButton.IsEnabled = $false }
+        if ($runDataActionsPackButton) { $runDataActionsPackButton.IsEnabled = $false }
+        if ($runDataActionsEnrichedPackButton) { $runDataActionsEnrichedPackButton.IsEnabled = $false }
+        if ($runPeakConcurrencyPackButton) { $runPeakConcurrencyPackButton.IsEnabled = $false }
+        if ($runMosMonthlyPackButton) { $runMosMonthlyPackButton.IsEnabled = $false }
+
+        $statusText.Text = "Running insight pack: $Label..."
+
+        Run-SelectedInsightPack -Compare:$false -DryRun:$false | Out-Null
         $statusText.Text = "Insight pack '$Label' completed."
-        Add-LogEntry "Insight pack '$Label' finished with $($result.Metrics.Count) metrics."
     }
     catch {
         $statusText.Text = "Insight pack '$Label' failed."
@@ -5900,6 +6335,9 @@ function Run-InsightPackWorkflow {
     finally {
         if ($runQueueSmokePackButton) { $runQueueSmokePackButton.IsEnabled = $true }
         if ($runDataActionsPackButton) { $runDataActionsPackButton.IsEnabled = $true }
+        if ($runDataActionsEnrichedPackButton) { $runDataActionsEnrichedPackButton.IsEnabled = $true }
+        if ($runPeakConcurrencyPackButton) { $runPeakConcurrencyPackButton.IsEnabled = $true }
+        if ($runMosMonthlyPackButton) { $runMosMonthlyPackButton.IsEnabled = $true }
     }
 }
 
@@ -6613,6 +7051,30 @@ if ($settingsMenuItem) {
         })
 }
 
+if ($appSettingsMenuItem) {
+    $appSettingsMenuItem.Add_Click({
+            $result = Show-AppSettingsDialog -CurrentRegion $script:Region -CurrentOAuthType $script:OAuthType -CurrentToken (Get-ExplorerAccessToken)
+            if (-not $result) { return }
+
+            Set-ExplorerRegion -Region ([string]$result.Region)
+            $saved = Load-ExplorerSettings
+            $saved.Region = $script:Region
+            Save-ExplorerSettings -Settings $saved
+
+            $tokenValue = if ($result.Token) { [string]$result.Token } else { '' }
+            if ([string]::IsNullOrWhiteSpace($tokenValue)) {
+                Set-ExplorerAccessToken -Token '' -OAuthType '(none)'
+            }
+            else {
+                $type = if ($result.OAuthType) { [string]$result.OAuthType } else { 'Manual' }
+                Set-ExplorerAccessToken -Token $tokenValue -OAuthType $type
+            }
+
+            Update-AuthUiState
+            Add-LogEntry "App settings updated (region=$($script:Region), oauth=$($script:OAuthType))."
+        })
+}
+
 if ($resetEndpointsMenuItem) {
     $resetEndpointsMenuItem.Add_Click({
             $defaultPath = Join-Path -Path $ScriptRoot -ChildPath "GenesysCloudAPIEndpoints.json"
@@ -6631,27 +7093,36 @@ if ($loginButton) {
     $loginButton.Add_Click({
             $newToken = Show-LoginWindow
             if ($newToken) {
-                $tokenBox.Text = $newToken
-                $tokenStatusText.Text = "Token set"
-                $tokenStatusText.Foreground = "Green"
-                Add-LogEntry "Token updated via Login."
+                if ($script:LastLoginRegion) {
+                    Set-ExplorerRegion -Region ([string]$script:LastLoginRegion)
+                    $saved = Load-ExplorerSettings
+                    $saved.Region = $script:Region
+                    Save-ExplorerSettings -Settings $saved
+                }
+
+                $oauthType = if ($script:LastLoginOAuthType) { [string]$script:LastLoginOAuthType } else { 'Login' }
+                Set-ExplorerAccessToken -Token ([string]$newToken) -OAuthType $oauthType
+                Update-AuthUiState
+                Add-LogEntry "Token updated via Login ($oauthType)."
             }
         })
 }
 
 if ($testTokenButton) {
     $testTokenButton.Add_Click({
-            $token = $tokenBox.Text.Trim()
+            $token = Get-ExplorerAccessToken
             if (-not $token) {
-                $tokenStatusText.Text = "No token provided"
-                $tokenStatusText.Foreground = "Red"
+                $script:TokenValidated = $false
+                Update-AuthUiState
                 Add-LogEntry "Token test failed: No token provided."
                 return
             }
 
             $testTokenButton.IsEnabled = $false
-            $tokenStatusText.Text = "Testing..."
-            $tokenStatusText.Foreground = "Gray"
+            if ($tokenStatusText) {
+                $tokenStatusText.Text = "Testing..."
+                $tokenStatusText.Foreground = "Gray"
+            }
             Add-LogEntry "Testing OAuth token validity..."
 
             try {
@@ -6660,24 +7131,24 @@ if ($testTokenButton) {
                     "Authorization" = "Bearer $token"
                     "Content-Type"  = "application/json"
                 }
-                $testUrl = "https://api.usw2.pure.cloud/api/v2/users/me"
+                $testUrl = "$ApiBaseUrl/api/v2/users/me"
 
-	                $response = Invoke-GCRequest -Method GET -Uri $testUrl -Headers $headers -AsResponse
+		                $response = Invoke-GCRequest -Method GET -Uri $testUrl -Headers $headers -AsResponse
 
-	                if ($response.StatusCode -eq 200) {
-	                    $tokenStatusText.Text = "✓ Valid"
-                    $tokenStatusText.Foreground = "Green"
+		                if ($response.StatusCode -eq 200) {
+		                    $script:TokenValidated = $true
+                            Update-AuthUiState
                     Add-LogEntry "Token test successful: Token is valid."
                 }
                 else {
-                    $tokenStatusText.Text = "⚠ Unknown status"
-                    $tokenStatusText.Foreground = "Orange"
+                    $script:TokenValidated = $false
+                    Update-AuthUiState
                     Add-LogEntry "Token test returned unexpected status: $($response.StatusCode)"
                 }
             }
             catch {
-                $tokenStatusText.Text = "✗ Invalid"
-                $tokenStatusText.Foreground = "Red"
+                $script:TokenValidated = $false
+                Update-AuthUiState
                 $errorMsg = $_.Exception.Message
                 Add-LogEntry "Token test failed: $errorMsg"
             }
@@ -6742,7 +7213,7 @@ if ($runConversationReportButton) {
                 return
             }
 
-            $token = $tokenBox.Text.Trim()
+            $token = Get-ExplorerAccessToken
             if (-not $token) {
                 if ($conversationReportStatus) {
                     $conversationReportStatus.Text = "Please provide an OAuth token."
@@ -7402,6 +7873,13 @@ if ($runPeakConcurrencyPackButton) {
         })
 }
 
+if ($runMosMonthlyPackButton) {
+    $runMosMonthlyPackButton.Add_Click({
+            # End-of-month reporting is typically "last full month"
+            Run-InsightPackWorkflow -Label "Monthly MOS (By Division)" -FileName "gc.mos.monthly.byDivision.v1.json" -TimePresetKey 'lastMonth'
+        })
+}
+
 if ($exportInsightBriefingButton) {
     $exportInsightBriefingButton.Add_Click({
             Export-InsightBriefingWorkflow
@@ -7410,10 +7888,10 @@ if ($exportInsightBriefingButton) {
 
 # Export PowerShell Script button
 	if ($exportPowerShellButton) {
-	    $exportPowerShellButton.Add_Click({
-            $selectedPath = $pathCombo.SelectedItem
-            $selectedMethod = $methodCombo.SelectedItem
-            $token = $tokenBox.Text
+		    $exportPowerShellButton.Add_Click({
+	            $selectedPath = $pathCombo.SelectedItem
+	            $selectedMethod = $methodCombo.SelectedItem
+	            $token = Get-ExplorerAccessToken
 
             if (-not $selectedPath -or -not $selectedMethod) {
                 $statusText.Text = "Select a path and method first."
@@ -7448,7 +7926,7 @@ if ($exportInsightBriefingButton) {
 	            } catch { $mode = 'Auto' }
 
 	            # Generate PowerShell script
-	            $script = Export-PowerShellScript -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token -Mode $mode
+		            $script = Export-PowerShellScript -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token -Region $script:Region -Mode $mode
 
             # Show in dialog with copy/save options
             $dialog = New-Object Microsoft.Win32.SaveFileDialog
@@ -7475,10 +7953,10 @@ if ($exportInsightBriefingButton) {
 
 # Export cURL Command button
 if ($exportCurlButton) {
-    $exportCurlButton.Add_Click({
-            $selectedPath = $pathCombo.SelectedItem
-            $selectedMethod = $methodCombo.SelectedItem
-            $token = $tokenBox.Text
+	    $exportCurlButton.Add_Click({
+	            $selectedPath = $pathCombo.SelectedItem
+	            $selectedMethod = $methodCombo.SelectedItem
+	            $token = Get-ExplorerAccessToken
 
             if (-not $selectedPath -or -not $selectedMethod) {
                 $statusText.Text = "Select a path and method first."
@@ -7502,7 +7980,7 @@ if ($exportCurlButton) {
             }
 
             # Generate cURL command
-            $curlCommand = Export-CurlCommand -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token
+	            $curlCommand = Export-CurlCommand -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token -Region $script:Region
 
             # Copy to clipboard and show confirmation
             [System.Windows.Clipboard]::SetText($curlCommand)
@@ -7520,12 +7998,29 @@ if ($exportCurlButton) {
 # Templates list selection changed
 if ($templatesList) {
     $templatesList.ItemsSource = $script:Templates
+    if (-not $script:TemplateSortState) { $script:TemplateSortState = @{} }
+    Enable-GridViewColumnSorting -ListView $templatesList -State $script:TemplateSortState
 
     # Load templates from disk into the collection
     if ($TemplatesData) {
-        foreach ($template in $TemplatesData) {
+        $defaultLastModified = $null
+        try {
+            if ($TemplatesFilePath -and (Test-Path -LiteralPath $TemplatesFilePath)) {
+                $defaultLastModified = (Get-Item -LiteralPath $TemplatesFilePath).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+            }
+        } catch { }
+
+        $normalizedTemplates = Normalize-Templates -Templates $TemplatesData -DefaultLastModified $defaultLastModified
+        foreach ($template in $normalizedTemplates) {
             $script:Templates.Add($template)
         }
+
+        # Persist normalized templates back to disk (removes blocked methods + adds LastModified)
+        try {
+            if ($TemplatesFilePath -and (Test-Path -LiteralPath $TemplatesFilePath)) {
+                Save-TemplatesToDisk -Path $TemplatesFilePath -Templates $script:Templates
+            }
+        } catch { }
     }
 
     $templatesList.Add_SelectionChanged({
@@ -7552,6 +8047,16 @@ if ($saveTemplateButton) {
                     "Missing Information",
                     [System.Windows.MessageBoxButton]::OK,
                     [System.Windows.MessageBoxImage]::Warning
+                )
+                return
+            }
+
+            if (-not (Test-TemplateMethodAllowed -Method $selectedMethod)) {
+                [System.Windows.MessageBox]::Show(
+                    "Templates for HTTP methods PATCH and DELETE are disabled.",
+                    "Template Not Allowed",
+                    [System.Windows.MessageBoxButton]::OK,
+                    [System.Windows.MessageBoxImage]::Information
                 )
                 return
             }
@@ -7592,6 +8097,7 @@ if ($saveTemplateButton) {
                 Group      = $groupCombo.SelectedItem
                 Parameters = $requestParams
                 Created    = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+                LastModified = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
             }
 
             # Add to collection and save
@@ -7696,7 +8202,8 @@ if ($importTemplatesButton) {
             $dialog.Title = "Import Templates"
 
             if ($dialog.ShowDialog() -eq $true) {
-                $importedTemplates = Load-TemplatesFromDisk -Path $dialog.FileName
+                $importedRaw = Load-TemplatesFromDisk -Path $dialog.FileName
+                $importedTemplates = if ($importedRaw) { Normalize-Templates -Templates $importedRaw -DefaultLastModified (Get-Date).ToString('yyyy-MM-dd HH:mm:ss') } else { @() }
                 if ($importedTemplates -and $importedTemplates.Count -gt 0) {
                     $importCount = 0
                     foreach ($template in $importedTemplates) {
@@ -7843,7 +8350,7 @@ $btnSubmit.Add_Click({
             "Content-Type" = "application/json"
         }
 
-        $token = $tokenBox.Text.Trim()
+        $token = Get-ExplorerAccessToken
         if ($token) {
             $headers["Authorization"] = "Bearer $token"
         }
@@ -7869,7 +8376,7 @@ $btnSubmit.Add_Click({
             }
         }
 
-        $baseUrl = "https://api.usw2.pure.cloud"
+        $baseUrl = $ApiBaseUrl
         $pathWithReplacements = $selectedPath
         foreach ($key in $pathParams.Keys) {
             $escaped = [uri]::EscapeDataString($pathParams[$key])

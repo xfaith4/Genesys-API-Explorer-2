@@ -1,0 +1,101 @@
+{
+  "id": "gc.mos.monthly.byDivision.v1",
+  "name": "Monthly MOS + WebRTC Errors (By Division)",
+  "version": "1.0.0",
+  "maturity": "alpha",
+  "owner": "Ops Insights",
+  "expectedRuntimeSec": 180,
+  "description": "End-of-month report: averages min MOS by division and computes % degraded (minMos < threshold) and % WebRTC error conversations (errorCode pattern) per division.",
+  "scopes": ["analytics:read", "authorization:read"],
+  "tags": ["mos", "quality", "webrtc", "monthly", "leadership"],
+  "examples": [
+    {
+      "title": "Defaults (set window via UI preset)",
+      "notes": "Pick 'Last full month' in the Ops Insights time preset, then run/export.",
+      "parameters": {
+        "degradedMosThreshold": 3.5,
+        "webrtcErrorCodeRegex": "webrtc|ice|stun|turn|rtp|media"
+      }
+    }
+  ],
+  "parameters": {
+    "startDate": { "type": "string", "required": true, "description": "ISO-8601 UTC start timestamp (e.g. 2025-12-01T00:00:00Z)." },
+    "endDate": { "type": "string", "required": true, "description": "ISO-8601 UTC end timestamp (e.g. 2026-01-01T00:00:00Z)." },
+    "degradedMosThreshold": { "type": "number", "default": 3.5, "description": "Anything below this min MOS is considered degraded." },
+    "webrtcErrorCodeRegex": { "type": "string", "default": "webrtc|ice|stun|turn|rtp|media", "description": "Regex applied to segment errorCode for WebRTC issues (PowerShell -match). Empty = any errorCode." },
+    "maxResults": { "type": "int", "default": 50000, "description": "Hard cap on total conversations collected via job results pagination." }
+  },
+  "evidenceScript": "param($ctx)\n\n$summary = $null\ntry { $summary = $ctx.Data.summary } catch { $summary = $null }\n\n$total = 0\n$avgMos = $null\n$degraded = 0\n$webrtc = 0\ntry { if ($summary) { $total = [int]$summary.OverallConversations } } catch { $total = 0 }\ntry { if ($summary) { $avgMos = $summary.OverallAvgMinMos } } catch { $avgMos = $null }\ntry { if ($summary) { $degraded = [int]$summary.OverallDegradedConversations } } catch { $degraded = 0 }\ntry { if ($summary) { $webrtc = [int]$summary.OverallWebrtcErrorConversations } } catch { $webrtc = 0 }\n\n$severity = 'Info'\ntry {\n  if ($avgMos -ne $null -and [double]$avgMos -lt 3.5) { $severity = 'Warning' }\n  if ($avgMos -ne $null -and [double]$avgMos -lt 3.0) { $severity = 'Critical' }\n} catch {}\n\n$impact = if ($total -gt 0) {\n  \"Month summary: total=$total; avgMinMos=$avgMos; degraded=$degraded; webrtcErr=$webrtc\"\n} else {\n  'No conversations returned for the selected window.'\n}\n\nreturn [pscustomobject]@{\n  Severity = $severity\n  Impact = $impact\n  LikelyCauses = @(\n    'Degraded MOS commonly correlates to network instability, endpoint/media-path changes, or capacity constraints.',\n    'WebRTC errorCode clustering can indicate ICE/TURN reachability issues, NAT/firewall behavior, or browser/agent updates.'\n  )\n  RecommendedActions = @(\n    'Review the top divisions by degraded MOS % and WebRTC error %; drill into sample conversations and error codes.',\n    'Correlate the month window to releases/config changes and known network incidents.',\n    'If the impacted divisions map to regions/sites, validate local network and firewall policy changes.'\n  )\n  WhyThisMatters = 'This is a director-grade monthly quality report: it quantifies customer/agent experience risk by division and highlights where to focus remediation.'\n}\n",
+  "pipeline": [
+    {
+      "id": "detailsJob",
+      "type": "jobpoll",
+      "maxPages": 500,
+      "collect": "conversations",
+      "create": {
+        "method": "POST",
+        "uri": "/api/v2/analytics/conversations/details/jobs",
+        "bodyTemplate": {
+          "interval": "{{startDate}}/{{endDate}}",
+          "order": "desc",
+          "orderBy": "conversationStart",
+          "segmentFilters": [
+            {
+              "type": "and",
+              "predicates": [
+                { "dimension": "mediaType", "operator": "matches", "value": "voice" }
+              ]
+            }
+          ],
+          "paging": { "pageSize": 200, "pageNumber": 1 }
+        }
+      }
+    },
+    {
+      "id": "divisionStats",
+      "type": "compute",
+      "script": "param($ctx)\n\nfunction SafeStr($v) { if ($null -eq $v) { return '' } try { return [string]$v } catch { return '' } }\nfunction SafeDouble($v) { try { if ($null -eq $v) { return $null } return [double]$v } catch { return $null } }\n\n$cap = 0\ntry { $cap = [int]$ctx.Parameters.maxResults } catch { $cap = 50000 }\nif ($cap -lt 1) { $cap = 1 }\n\n$threshold = 3.5\ntry { $threshold = [double]$ctx.Parameters.degradedMosThreshold } catch { $threshold = 3.5 }\n\n$webrtcPattern = ''\ntry { $webrtcPattern = SafeStr $ctx.Parameters.webrtcErrorCodeRegex } catch { $webrtcPattern = '' }\n\n$convs = @()\ntry { $convs = @($ctx.Data.detailsJob.Items) } catch { $convs = @() }\nif ($convs.Count -gt $cap) { $convs = @($convs | Select-Object -First $cap) }\n\n$stats = @{}\n$overallConversations = 0\n$overallWithMos = 0\n$overallMosSum = 0.0\n$overallDegraded = 0\n$overallWebrtc = 0\n\n$degradedSample = New-Object System.Collections.ArrayList\n$webrtcSample = New-Object System.Collections.ArrayList\n\nforeach ($c in $convs) {\n  if (-not $c) { continue }\n  $overallConversations++\n\n  $divisionId = ''\n  try {\n    if ($c.PSObject.Properties.Name -contains 'divisionIds' -and $c.divisionIds) { $divisionId = SafeStr (@($c.divisionIds) | Select-Object -First 1) }\n    elseif ($c.PSObject.Properties.Name -contains 'divisionId' -and $c.divisionId) { $divisionId = SafeStr $c.divisionId }\n  } catch { $divisionId = '' }\n  if ([string]::IsNullOrWhiteSpace($divisionId)) { $divisionId = '<none>' }\n\n  if (-not $stats.ContainsKey($divisionId)) {\n    $stats[$divisionId] = [ordered]@{\n      DivisionId = $divisionId\n      Conversations = 0\n      WithMos = 0\n      MosSum = 0.0\n      DegradedCount = 0\n      WebrtcErrorCount = 0\n      ErrorCodeSamples = (New-Object System.Collections.Generic.HashSet[string])\n    }\n  }\n\n  $entry = $stats[$divisionId]\n  $entry.Conversations = [int]$entry.Conversations + 1\n\n  $minMos = $null\n  try {\n    if ($c.PSObject.Properties.Name -contains 'mediaStatsMinConversationMos') { $minMos = SafeDouble $c.mediaStatsMinConversationMos }\n  } catch { $minMos = $null }\n\n  if ($minMos -ne $null) {\n    $entry.WithMos = [int]$entry.WithMos + 1\n    $entry.MosSum = [double]$entry.MosSum + [double]$minMos\n    $overallWithMos++\n    $overallMosSum = [double]$overallMosSum + [double]$minMos\n\n    if ([double]$minMos -lt $threshold) {\n      $entry.DegradedCount = [int]$entry.DegradedCount + 1\n      $overallDegraded++\n      if ($degradedSample.Count -lt 250) {\n        $cid = ''\n        try { if ($c.PSObject.Properties.Name -contains 'conversationId') { $cid = SafeStr $c.conversationId } elseif ($c.PSObject.Properties.Name -contains 'id') { $cid = SafeStr $c.id } } catch { $cid = '' }\n        $start = ''\n        try { $start = SafeStr $c.conversationStart } catch { $start = '' }\n        [void]$degradedSample.Add([pscustomobject]@{ ConversationId=$cid; DivisionId=$divisionId; ConversationStartUtc=$start; MinMos=$minMos })\n      }\n    }\n  }\n\n  $hasWebrtc = $false\n  $firstErr = ''\n  foreach ($p in @($c.participants)) {\n    foreach ($s in @($p.sessions)) {\n      if ((SafeStr $s.provider) -ne 'WebRTC') { continue }\n      if ((SafeStr $s.mediaType) -ne 'voice') { continue }\n      foreach ($seg in @($s.segments)) {\n        if (-not $seg) { continue }\n        $err = SafeStr $seg.errorCode\n        if ([string]::IsNullOrWhiteSpace($err)) { continue }\n        if (-not [string]::IsNullOrWhiteSpace($webrtcPattern) -and ($err -notmatch $webrtcPattern)) { continue }\n        $hasWebrtc = $true\n        $firstErr = $err\n        try { [void]$entry.ErrorCodeSamples.Add($err) } catch {}\n        break\n      }\n      if ($hasWebrtc) { break }\n    }\n    if ($hasWebrtc) { break }\n  }\n\n  if ($hasWebrtc) {\n    $entry.WebrtcErrorCount = [int]$entry.WebrtcErrorCount + 1\n    $overallWebrtc++\n    if ($webrtcSample.Count -lt 250) {\n      $cid = ''\n      try { if ($c.PSObject.Properties.Name -contains 'conversationId') { $cid = SafeStr $c.conversationId } elseif ($c.PSObject.Properties.Name -contains 'id') { $cid = SafeStr $c.id } } catch { $cid = '' }\n      $start = ''\n      try { $start = SafeStr $c.conversationStart } catch { $start = '' }\n      [void]$webrtcSample.Add([pscustomobject]@{ ConversationId=$cid; DivisionId=$divisionId; ConversationStartUtc=$start; ErrorCode=$firstErr; MinMos=$minMos })\n    }\n  }\n}\n\n$overallAvg = $null\nif ($overallWithMos -gt 0) {\n  $overallAvg = [math]::Round(($overallMosSum / [double]$overallWithMos), 3)\n}\n\n$rows = foreach ($k in $stats.Keys) {\n  $e = $stats[$k]\n\n  $avg = $null\n  if ([int]$e.WithMos -gt 0) {\n    $avg = [math]::Round(([double]$e.MosSum / [double]$e.WithMos), 3)\n  }\n\n  $pctDegraded = $null\n  $pctWebrtc = $null\n  $pctShare = $null\n  $pctMosAvailable = $null\n\n  if ([int]$e.Conversations -gt 0) {\n    $pctDegraded = [math]::Round((100.0 * [double]$e.DegradedCount / [double]$e.Conversations), 2)\n    $pctWebrtc = [math]::Round((100.0 * [double]$e.WebrtcErrorCount / [double]$e.Conversations), 2)\n    $pctMosAvailable = [math]::Round((100.0 * [double]$e.WithMos / [double]$e.Conversations), 2)\n  }\n\n  if ($overallConversations -gt 0) {\n    $pctShare = [math]::Round((100.0 * [double]$e.Conversations / [double]$overallConversations), 2)\n  }\n\n  $sampleCodes = @()\n  try { $sampleCodes = @($e.ErrorCodeSamples | Sort-Object | Select-Object -First 8) } catch { $sampleCodes = @() }\n\n  [pscustomobject]@{\n    DivisionId            = [string]$e.DivisionId\n    Conversations         = [int]$e.Conversations\n    SharePct              = $pctShare\n    WithMos               = [int]$e.WithMos\n    MosAvailablePct       = $pctMosAvailable\n    AvgMinMos             = $avg\n    DegradedCount         = [int]$e.DegradedCount\n    DegradedPct           = $pctDegraded\n    WebrtcErrorCount      = [int]$e.WebrtcErrorCount\n    WebrtcErrorPct        = $pctWebrtc\n    WebrtcErrorCodeSample = ($sampleCodes -join '; ')\n  }\n}\n\n$summary = [pscustomobject]@{\n  OverallConversations = $overallConversations\n  OverallWithMos = $overallWithMos\n  OverallAvgMinMos = $overallAvg\n  OverallDegradedConversations = $overallDegraded\n  OverallWebrtcErrorConversations = $overallWebrtc\n}\n\n[pscustomobject]@{ Rows = @($rows | Sort-Object Conversations -Descending); Summary = $summary; DegradedSample = @($degradedSample); WebrtcSample = @($webrtcSample) }\n"
+    },
+    {
+      "id": "divisionStatsEnriched",
+      "type": "join",
+      "sourceStepId": "divisionStats",
+      "itemsProperty": "Rows",
+      "key": "DivisionId",
+      "assign": "Division",
+      "maxUnique": 200,
+      "lookup": { "method": "GET", "uri": "/api/v2/authorization/divisions/{id}" }
+    },
+    {
+      "id": "summary",
+      "type": "compute",
+      "script": "param($ctx)\n$ctx.Data.divisionStats.Summary\n"
+    },
+    {
+      "id": "metricDivisionSummary",
+      "type": "metric",
+      "script": "param($ctx)\n$items = @($ctx.Data.divisionStatsEnriched)\n$rows = foreach ($it in $items) {\n  $name = ''\n  try { if ($it.Division -and $it.Division.name) { $name = [string]$it.Division.name } } catch {}\n  [pscustomobject]@{\n    DivisionId            = $it.DivisionId\n    DivisionName          = $name\n    Conversations         = $it.Conversations\n    SharePct              = $it.SharePct\n    WithMos               = $it.WithMos\n    MosAvailablePct       = $it.MosAvailablePct\n    AvgMinMos             = $it.AvgMinMos\n    DegradedCount         = $it.DegradedCount\n    DegradedPct           = $it.DegradedPct\n    WebrtcErrorCount      = $it.WebrtcErrorCount\n    WebrtcErrorPct        = $it.WebrtcErrorPct\n    WebrtcErrorCodeSample = $it.WebrtcErrorCodeSample\n  }\n}\n[pscustomobject]@{ title='Monthly MOS + WebRTC Errors by Division'; value=$rows.Count; items=@($rows) }\n"
+    },
+    {
+      "id": "metricTopDegraded",
+      "type": "metric",
+      "script": "param($ctx)\n$rows = @($ctx.Data.divisionStatsEnriched | ForEach-Object {\n  $name = ''\n  try { if ($_.Division -and $_.Division.name) { $name = [string]$_.Division.name } } catch {}\n  [pscustomobject]@{ DivisionId=$_.DivisionId; DivisionName=$name; DegradedPct=$_.DegradedPct; DegradedCount=$_.DegradedCount; Conversations=$_.Conversations; AvgMinMos=$_.AvgMinMos }\n}) | Where-Object { $null -ne $_.DegradedPct } | Sort-Object DegradedPct -Descending | Select-Object -First 15\n[pscustomobject]@{ title='Top Divisions by Degraded %'; value=$rows.Count; items=@($rows) }\n"
+    },
+    {
+      "id": "metricTopWebrtc",
+      "type": "metric",
+      "script": "param($ctx)\n$rows = @($ctx.Data.divisionStatsEnriched | ForEach-Object {\n  $name = ''\n  try { if ($_.Division -and $_.Division.name) { $name = [string]$_.Division.name } } catch {}\n  [pscustomobject]@{ DivisionId=$_.DivisionId; DivisionName=$name; WebrtcErrorPct=$_.WebrtcErrorPct; WebrtcErrorCount=$_.WebrtcErrorCount; Conversations=$_.Conversations; ErrorCodeSample=$_.WebrtcErrorCodeSample }\n}) | Where-Object { $null -ne $_.WebrtcErrorPct } | Sort-Object WebrtcErrorPct -Descending | Select-Object -First 15\n[pscustomobject]@{ title='Top Divisions by WebRTC Error %'; value=$rows.Count; items=@($rows) }\n"
+    },
+    {
+      "id": "drilldownDegradedSample",
+      "type": "drilldown",
+      "script": "param($ctx)\n[pscustomobject]@{ title='Degraded Conversation Samples (minMos < threshold)'; items=@($ctx.Data.divisionStats.DegradedSample) }\n"
+    },
+    {
+      "id": "drilldownWebrtcSample",
+      "type": "drilldown",
+      "script": "param($ctx)\n[pscustomobject]@{ title='WebRTC Error Conversation Samples'; items=@($ctx.Data.divisionStats.WebrtcSample) }\n"
+    }
+  ]
+}
+
