@@ -7,7 +7,7 @@ if (-not (Test-Path -LiteralPath $coreManifest)) {
 
 Import-Module -Name $coreManifest -Force -ErrorAction Stop
 
-$resourceScript = Join-Path -Path $moduleRoot -ChildPath "Resources/GenesysCloudAPIExplorer.ps1"
+$resourceScript = Join-Path -Path $moduleRoot -ChildPath "Resources/GenesysCloudAPIExplorer.UI.ps1"
 if (-not (Test-Path -LiteralPath $resourceScript)) {
     throw "OpsConsole UI script not found at $resourceScript"
 }

@@ -59,7 +59,7 @@ try {
         Write-Host "1. Copy the OpsConsole module and resource files into the executable directory:" -ForegroundColor White
         Write-Host "   - apps/OpsConsole/OpsConsole.psd1" -ForegroundColor Gray
         Write-Host "   - apps/OpsConsole/OpsConsole.psm1" -ForegroundColor Gray
-        Write-Host "   - apps/OpsConsole/Resources/GenesysCloudAPIExplorer.ps1" -ForegroundColor Gray
+        Write-Host "   - apps/OpsConsole/Resources/GenesysCloudAPIExplorer.UI.ps1" -ForegroundColor Gray
         Write-Host "   - apps/OpsConsole/Resources/DefaultTemplates.json" -ForegroundColor Gray
         Write-Host "   - apps/OpsConsole/Resources/ExamplePostBodies.json" -ForegroundColor Gray
         Write-Host "   - apps/OpsConsole/Resources/GenesysCloudAPIEndpoints.json" -ForegroundColor Gray

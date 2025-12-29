@@ -10,6 +10,7 @@
 .NOTES
     - Valid JSON catalog required from the Genesys Cloud API Explorer.
     - Paste your OAuth token into the supplied field before sending requests.
+    - UI implementation script (launch via `.\GenesysCloudAPIExplorer.ps1` from repo root).
 #>
 
 Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase, System.Xaml

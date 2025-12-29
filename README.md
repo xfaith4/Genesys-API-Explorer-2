@@ -183,7 +183,7 @@ Genesys-API-Explorer/
 │       ├── OpsConsole.psd1                      # Module manifest defining Start-GCOpsConsole
 │       ├── OpsConsole.psm1                      # Module implementation
 │       └── Resources/
-│           ├── GenesysCloudAPIExplorer.ps1      # WPF GUI implementation executed by the module
+│           ├── GenesysCloudAPIExplorer.UI.ps1   # WPF GUI implementation executed by the module
 │           ├── GenesysCloudAPIEndpoints.json     # API endpoint catalog
 │           ├── DefaultTemplates.json             # Pre-configured POST conversation templates
 │           └── ExamplePostBodies.json            # Example request bodies for common endpoints
