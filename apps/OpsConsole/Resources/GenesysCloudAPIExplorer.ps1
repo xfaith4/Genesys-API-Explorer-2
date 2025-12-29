@@ -107,36 +107,36 @@ function Get-InsightPackCatalog {
                 }
 
                 $items.Add([pscustomobject]@{
-                    Id          = [string]$pack.id
-                    Name        = [string](Get-FirstNonEmptyValue -Values @($pack.name, $pack.id) -Default $pack.id)
-                    Version     = [string](Get-FirstNonEmptyValue -Values @($pack.version) -Default '')
-                    Description = [string](Get-FirstNonEmptyValue -Values @($pack.description) -Default '')
-                    Scopes      = @(Get-FirstNonEmptyValue -Values @($pack.scopes, $pack.requiredScopes) -Default @())
-                    Owner       = [string](Get-FirstNonEmptyValue -Values @($pack.owner) -Default '')
-                    Maturity    = [string](Get-FirstNonEmptyValue -Values @($pack.maturity) -Default '')
-                    ExpectedRuntimeSec = if ($pack.PSObject.Properties.Name -contains 'expectedRuntimeSec') { $pack.expectedRuntimeSec } else { $null }
-                    Tags        = @($pack.tags)
-                    Endpoints   = @(
-                        foreach ($step in @($pack.pipeline)) {
-                            if (-not $step -or -not $step.type) { continue }
-                            $t = $step.type.ToString().ToLowerInvariant()
-                            if ($t -eq 'gcrequest') {
-                                (Get-FirstNonEmptyValue -Values @($step.uri, $step.path) -Default $null)
+                        Id                 = [string]$pack.id
+                        Name               = [string](Get-FirstNonEmptyValue -Values @($pack.name, $pack.id) -Default $pack.id)
+                        Version            = [string](Get-FirstNonEmptyValue -Values @($pack.version) -Default '')
+                        Description        = [string](Get-FirstNonEmptyValue -Values @($pack.description) -Default '')
+                        Scopes             = @(Get-FirstNonEmptyValue -Values @($pack.scopes, $pack.requiredScopes) -Default @())
+                        Owner              = [string](Get-FirstNonEmptyValue -Values @($pack.owner) -Default '')
+                        Maturity           = [string](Get-FirstNonEmptyValue -Values @($pack.maturity) -Default '')
+                        ExpectedRuntimeSec = if ($pack.PSObject.Properties.Name -contains 'expectedRuntimeSec') { $pack.expectedRuntimeSec } else { $null }
+                        Tags               = @($pack.tags)
+                        Endpoints          = @(
+                            foreach ($step in @($pack.pipeline)) {
+                                if (-not $step -or -not $step.type) { continue }
+                                $t = $step.type.ToString().ToLowerInvariant()
+                                if ($t -eq 'gcrequest') {
+                                    (Get-FirstNonEmptyValue -Values @($step.uri, $step.path) -Default $null)
+                                }
+                                elseif ($t -eq 'jobpoll' -and $step.create) {
+                                    (Get-FirstNonEmptyValue -Values @($step.create.uri, $step.create.path) -Default $null)
+                                }
+                                elseif ($t -eq 'join' -and $step.lookup) {
+                                    (Get-FirstNonEmptyValue -Values @($step.lookup.uri, $step.lookup.path) -Default $null)
+                                }
                             }
-                            elseif ($t -eq 'jobpoll' -and $step.create) {
-                                (Get-FirstNonEmptyValue -Values @($step.create.uri, $step.create.path) -Default $null)
-                            }
-                            elseif ($t -eq 'join' -and $step.lookup) {
-                                (Get-FirstNonEmptyValue -Values @($step.lookup.uri, $step.lookup.path) -Default $null)
-                            }
-                        }
-                    ) | Where-Object { $_ }
-                    Examples    = $examples
-                    FileName    = $file.Name
-                    FullPath    = $file.FullName
-                    Pack        = $pack
-                    Display     = if ($pack.name) { "$($pack.name)  [$($pack.id)]" } else { [string]$pack.id }
-                }) | Out-Null
+                        ) | Where-Object { $_ }
+                        Examples           = $examples
+                        FileName           = $file.Name
+                        FullPath           = $file.FullName
+                        Pack               = $pack
+                        Display            = if ($pack.name) { "$($pack.name)  [$($pack.id)]" } else { [string]$pack.id }
+                    }) | Out-Null
             }
             catch {
                 try { $script:InsightPackCatalogErrors.Add("$packPath :: $($_.Exception.Message)") | Out-Null } catch { }
@@ -149,7 +149,7 @@ function Get-InsightPackCatalog {
 
 function Get-InsightTimePresets {
     return @(
-        [pscustomobject]@{ Key = 'last7';  Name = 'Last 7 days (ending now)' },
+        [pscustomobject]@{ Key = 'last7'; Name = 'Last 7 days (ending now)' },
         [pscustomobject]@{ Key = 'last30'; Name = 'Last 30 days (ending now)' },
         [pscustomobject]@{ Key = 'thisWeek'; Name = 'This week (Mon 00:00 → now, UTC)' },
         [pscustomobject]@{ Key = 'lastWeek'; Name = 'Last full week (Mon → Mon, UTC)' },
@@ -759,48 +759,48 @@ function Show-AppSettingsDialog {
 
     if ($clearTokenButton) {
         $clearTokenButton.Add_Click({
-            if ($tokenText) { $tokenText.Text = '' }
-            if ($oauthTypeValue) { $oauthTypeValue.Text = '(none)' }
-        })
+                if ($tokenText) { $tokenText.Text = '' }
+                if ($oauthTypeValue) { $oauthTypeValue.Text = '(none)' }
+            })
     }
 
     if ($tokenText) {
         $tokenText.Add_TextChanged({
-            $txt = $tokenText.Text
-            if ([string]::IsNullOrWhiteSpace($txt)) {
-                if ($oauthTypeValue) { $oauthTypeValue.Text = '(none)' }
-            }
-            else {
-                if ($oauthTypeValue) { $oauthTypeValue.Text = 'Manual' }
-            }
-        })
+                $txt = $tokenText.Text
+                if ([string]::IsNullOrWhiteSpace($txt)) {
+                    if ($oauthTypeValue) { $oauthTypeValue.Text = '(none)' }
+                }
+                else {
+                    if ($oauthTypeValue) { $oauthTypeValue.Text = 'Manual' }
+                }
+            })
     }
 
     $result = $null
     if ($applyButton) {
         $applyButton.Add_Click({
-            $regionValue = 'mypurecloud.com'
-            if ($regionCombo -and $regionCombo.SelectedItem) {
-                $regionValue = $regionCombo.SelectedItem.Content.ToString().Trim()
-            }
-            $tokenValue = if ($tokenText) { $tokenText.Text } else { '' }
-            $oauthType = if ($oauthTypeValue) { $oauthTypeValue.Text } else { '(none)' }
+                $regionValue = 'mypurecloud.com'
+                if ($regionCombo -and $regionCombo.SelectedItem) {
+                    $regionValue = $regionCombo.SelectedItem.Content.ToString().Trim()
+                }
+                $tokenValue = if ($tokenText) { $tokenText.Text } else { '' }
+                $oauthType = if ($oauthTypeValue) { $oauthTypeValue.Text } else { '(none)' }
 
-            $script:AppSettingsDialogResult = [pscustomobject]@{
-                Region    = $regionValue
-                Token     = $tokenValue
-                OAuthType = $oauthType
-            }
-            $win.DialogResult = $true
-            $win.Close()
-        })
+                $script:AppSettingsDialogResult = [pscustomobject]@{
+                    Region    = $regionValue
+                    Token     = $tokenValue
+                    OAuthType = $oauthType
+                }
+                $win.DialogResult = $true
+                $win.Close()
+            })
     }
 
     if ($cancelButton) {
         $cancelButton.Add_Click({
-            $win.DialogResult = $false
-            $win.Close()
-        })
+                $win.DialogResult = $false
+                $win.Close()
+            })
     }
 
     $script:AppSettingsDialogResult = $null
@@ -1541,7 +1541,7 @@ function Export-PowerShellScript {
         # Portable = always use Invoke-WebRequest
         # OpsInsights = require Invoke-GCRequest (module transport)
         [Parameter()]
-        [ValidateSet('Auto','Portable','OpsInsights')]
+        [ValidateSet('Auto', 'Portable', 'OpsInsights')]
         [string]$Mode = 'Auto'
     )
 
@@ -2805,10 +2805,10 @@ function Get-PaginatedResults {
             & $ProgressCallback -PageNumber $pageNumber -Status "Fetching page $pageNumber..."
         }
 
-	        try {
-	            $url = if ($currentPath -match '^https?://') { $currentPath } else { "$BaseUrl$currentPath" }
-	            $response = Invoke-GCRequest -Method $Method -Uri $url -Headers $Headers -Body $Body -AsResponse
-	            $data = $response.Content | ConvertFrom-Json
+        try {
+            $url = if ($currentPath -match '^https?://') { $currentPath } else { "$BaseUrl$currentPath" }
+            $response = Invoke-GCRequest -Method $Method -Uri $url -Headers $Headers -Body $Body -AsResponse
+            $data = $response.Content | ConvertFrom-Json
 
             # Add results from this page
             if ($data.entities) {
@@ -2960,10 +2960,10 @@ function Get-ConversationReport {
             Message   = ""
         }
 
-	        try {
-	            $response = Invoke-GCRequest -Method GET -Uri $url -Headers $Headers -AsResponse
-	            $data = $response.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
-	            $result.($endpoint.PropertyName) = $data
+        try {
+            $response = Invoke-GCRequest -Method GET -Uri $url -Headers $Headers -AsResponse
+            $data = $response.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
+            $result.($endpoint.PropertyName) = $data
 
             $logEntry.Status = "Success"
             $logEntry.Message = "Retrieved successfully"
@@ -4787,12 +4787,12 @@ function Get-JobStatus {
         return
     }
 
-	$statusUrl = "$ApiBaseUrl$($JobTracker.Path)/$($JobTracker.JobId)"
-	try {
-	    $statusResponse = Invoke-GCRequest -Method GET -Uri $statusUrl -Headers $JobTracker.Headers -AsResponse
-	    $statusJson = $statusResponse.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
-	    $statusValue = if ($statusJson.status) { $statusJson.status } elseif ($statusJson.state) { $statusJson.state } else { $null }
-	    $JobTracker.Status = $statusValue
+    $statusUrl = "$ApiBaseUrl$($JobTracker.Path)/$($JobTracker.JobId)"
+    try {
+        $statusResponse = Invoke-GCRequest -Method GET -Uri $statusUrl -Headers $JobTracker.Headers -AsResponse
+        $statusJson = $statusResponse.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
+        $statusValue = if ($statusJson.status) { $statusJson.status } elseif ($statusJson.state) { $statusJson.state } else { $null }
+        $JobTracker.Status = $statusValue
         $JobTracker.LastUpdate = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
         Update-JobPanel -Status $statusValue -Updated $JobTracker.LastUpdate
         Add-LogEntry "Job $($JobTracker.JobId) status checked: $statusValue"
@@ -5034,12 +5034,14 @@ function Enable-GridViewColumnSorting {
     )
 
     if (-not $State) { $State = @{} }
-    if (-not $State.ContainsKey('Property')) { $State.Property = $null }
-    if (-not $State.ContainsKey('Direction')) { $State.Direction = [System.ComponentModel.ListSortDirection]::Ascending }
+    if (-not $State.ContainsKey('Property')) { $State['Property'] = $null }
+    if (-not $State.ContainsKey('Direction')) { $State['Direction'] = [System.ComponentModel.ListSortDirection]::Ascending }
+
+    $ListView.Resources['ColumnSortState'] = $State
 
     $ListView.AddHandler(
         [System.Windows.Controls.GridViewColumnHeader]::ClickEvent,
-        [System.Windows.RoutedEventHandler]{
+        [System.Windows.RoutedEventHandler] {
             param($sender, $e)
 
             $header = $e.OriginalSource
@@ -5049,9 +5051,18 @@ function Enable-GridViewColumnSorting {
             $sortBy = [string]$header.Tag
             if ([string]::IsNullOrWhiteSpace($sortBy)) { return }
 
+            $State = $null
+            try { $State = $sender.Resources['ColumnSortState'] } catch { }
+            if (-not ($State -is [hashtable])) {
+                $State = @{}
+                $State['Property'] = $null
+                $State['Direction'] = [System.ComponentModel.ListSortDirection]::Ascending
+                try { $sender.Resources['ColumnSortState'] = $State } catch { }
+            }
+
             $direction = [System.ComponentModel.ListSortDirection]::Ascending
-            if ($State.Property -eq $sortBy) {
-                $direction = if ($State.Direction -eq [System.ComponentModel.ListSortDirection]::Ascending) {
+            if ($State['Property'] -eq $sortBy) {
+                $direction = if ($State['Direction'] -eq [System.ComponentModel.ListSortDirection]::Ascending) {
                     [System.ComponentModel.ListSortDirection]::Descending
                 }
                 else {
@@ -5059,10 +5070,10 @@ function Enable-GridViewColumnSorting {
                 }
             }
 
-            $State.Property = $sortBy
-            $State.Direction = $direction
+            $State['Property'] = $sortBy
+            $State['Direction'] = $direction
 
-            $view = [System.ComponentModel.CollectionViewSource]::GetDefaultView($sender.ItemsSource)
+            $view = [System.Windows.Data.CollectionViewSource]::GetDefaultView($sender.ItemsSource)
             if (-not $view) { return }
 
             $view.SortDescriptions.Clear()
@@ -5905,43 +5916,43 @@ $mainTabControl = $Window.FindName("MainTabControl")
 $requestSelectorGrid = $Window.FindName("RequestSelectorGrid")
 $favoritesBorder = $Window.FindName("FavoritesBorder")
 $actionButtonsPanel = $Window.FindName("ActionButtonsPanel")
- $runQueueSmokePackButton = $Window.FindName("RunQueueSmokePackButton")
- $runDataActionsPackButton = $Window.FindName("RunDataActionsPackButton")
- $runDataActionsEnrichedPackButton = $Window.FindName("RunDataActionsEnrichedPackButton")
- $runPeakConcurrencyPackButton = $Window.FindName("RunPeakConcurrencyPackButton")
- $runMosMonthlyPackButton = $Window.FindName("RunMosMonthlyPackButton")
- $runSelectedInsightPackButton = $Window.FindName("RunSelectedInsightPackButton")
- $compareSelectedInsightPackButton = $Window.FindName("CompareSelectedInsightPackButton")
- $insightBaselineModeCombo = $Window.FindName("InsightBaselineModeCombo")
- $dryRunSelectedInsightPackButton = $Window.FindName("DryRunSelectedInsightPackButton")
- $useInsightCacheCheckbox = $Window.FindName("UseInsightCacheCheckbox")
- $strictInsightValidationCheckbox = $Window.FindName("StrictInsightValidationCheckbox")
- $insightCacheTtlInput = $Window.FindName("InsightCacheTtlInput")
- $insightPackCombo = $Window.FindName("InsightPackCombo")
- $insightPackDescriptionText = $Window.FindName("InsightPackDescriptionText")
- $insightPackMetaText = $Window.FindName("InsightPackMetaText")
- $insightPackWarningsText = $Window.FindName("InsightPackWarningsText")
- $insightPackParametersPanel = $Window.FindName("InsightPackParametersPanel")
- $insightTimePresetCombo = $Window.FindName("InsightTimePresetCombo")
- $applyInsightTimePresetButton = $Window.FindName("ApplyInsightTimePresetButton")
- $insightPackExampleCombo = $Window.FindName("InsightPackExampleCombo")
- $loadInsightPackExampleButton = $Window.FindName("LoadInsightPackExampleButton")
- $insightGlobalStartInput = $Window.FindName("InsightGlobalStartInput")
- $insightGlobalEndInput = $Window.FindName("InsightGlobalEndInput")
- $exportInsightBriefingButton = $Window.FindName("ExportInsightBriefingButton")
- $insightEvidenceSummary = $Window.FindName("InsightEvidenceSummary")
+$runQueueSmokePackButton = $Window.FindName("RunQueueSmokePackButton")
+$runDataActionsPackButton = $Window.FindName("RunDataActionsPackButton")
+$runDataActionsEnrichedPackButton = $Window.FindName("RunDataActionsEnrichedPackButton")
+$runPeakConcurrencyPackButton = $Window.FindName("RunPeakConcurrencyPackButton")
+$runMosMonthlyPackButton = $Window.FindName("RunMosMonthlyPackButton")
+$runSelectedInsightPackButton = $Window.FindName("RunSelectedInsightPackButton")
+$compareSelectedInsightPackButton = $Window.FindName("CompareSelectedInsightPackButton")
+$insightBaselineModeCombo = $Window.FindName("InsightBaselineModeCombo")
+$dryRunSelectedInsightPackButton = $Window.FindName("DryRunSelectedInsightPackButton")
+$useInsightCacheCheckbox = $Window.FindName("UseInsightCacheCheckbox")
+$strictInsightValidationCheckbox = $Window.FindName("StrictInsightValidationCheckbox")
+$insightCacheTtlInput = $Window.FindName("InsightCacheTtlInput")
+$insightPackCombo = $Window.FindName("InsightPackCombo")
+$insightPackDescriptionText = $Window.FindName("InsightPackDescriptionText")
+$insightPackMetaText = $Window.FindName("InsightPackMetaText")
+$insightPackWarningsText = $Window.FindName("InsightPackWarningsText")
+$insightPackParametersPanel = $Window.FindName("InsightPackParametersPanel")
+$insightTimePresetCombo = $Window.FindName("InsightTimePresetCombo")
+$applyInsightTimePresetButton = $Window.FindName("ApplyInsightTimePresetButton")
+$insightPackExampleCombo = $Window.FindName("InsightPackExampleCombo")
+$loadInsightPackExampleButton = $Window.FindName("LoadInsightPackExampleButton")
+$insightGlobalStartInput = $Window.FindName("InsightGlobalStartInput")
+$insightGlobalEndInput = $Window.FindName("InsightGlobalEndInput")
+$exportInsightBriefingButton = $Window.FindName("ExportInsightBriefingButton")
+$insightEvidenceSummary = $Window.FindName("InsightEvidenceSummary")
 $insightMetricsList = $Window.FindName("InsightMetricsList")
 $insightDrilldownsList = $Window.FindName("InsightDrilldownsList")
 $insightBriefingPathText = $Window.FindName("InsightBriefingPathText")
 $insightBriefingsList = $Window.FindName("InsightBriefingsList")
 $refreshInsightBriefingsButton = $Window.FindName("RefreshInsightBriefingsButton")
 $openBriefingsFolderButton = $Window.FindName("OpenBriefingsFolderButton")
-	$openBriefingHtmlButton = $Window.FindName("OpenBriefingHtmlButton")
-	$openBriefingSnapshotButton = $Window.FindName("OpenBriefingSnapshotButton")
-	$exportPowerShellButton = $Window.FindName("ExportPowerShellButton")
-	$powerShellExportModeCombo = $Window.FindName("PowerShellExportModeCombo")
-	$exportCurlButton = $Window.FindName("ExportCurlButton")
-	$templatesList = $Window.FindName("TemplatesList")
+$openBriefingHtmlButton = $Window.FindName("OpenBriefingHtmlButton")
+$openBriefingSnapshotButton = $Window.FindName("OpenBriefingSnapshotButton")
+$exportPowerShellButton = $Window.FindName("ExportPowerShellButton")
+$powerShellExportModeCombo = $Window.FindName("PowerShellExportModeCombo")
+$exportCurlButton = $Window.FindName("ExportCurlButton")
+$templatesList = $Window.FindName("TemplatesList")
 $saveTemplateButton = $Window.FindName("SaveTemplateButton")
 $loadTemplateButton = $Window.FindName("LoadTemplateButton")
 $deleteTemplateButton = $Window.FindName("DeleteTemplateButton")
@@ -6495,40 +6506,8 @@ $methodCombo.Add_SelectionChanged({
             $label.Margin = New-Object System.Windows.Thickness 0, 0, 10, 0
             [System.Windows.Controls.Grid]::SetColumn($label, 0)
 
-            # Create appropriate control based on parameter type and metadata
-            $inputControl = $null
-
-            # Check if parameter is array type (special handling)
-            if ($param.type -eq "array") {
-                $textbox = New-Object System.Windows.Controls.TextBox
-                $textbox.MinWidth = 360
-                $textbox.HorizontalAlignment = "Stretch"
-                $textbox.TextWrapping = "Wrap"
-                $textbox.Height = 28
-                if ($param.required) {
-                    $textbox.Background = [System.Windows.Media.Brushes]::LightYellow
-                }
-
-                # Build enhanced tooltip with array information
-                $arrayTooltip = $param.description
-                if ($param.items -and $param.items.type) {
-                    $arrayTooltip += "`n`nArray of: $($param.items.type)"
-                }
-                $arrayTooltip += "`n`nEnter comma-separated values (e.g., value1, value2, value3)"
-                $textbox.ToolTip = $arrayTooltip
-
-                # Store metadata for validation
-                $textbox.Tag = @{
-                    Type     = "array"
-                    ItemType = if ($param.items) { $param.items.type } else { "string" }
-                }
-
-                [System.Windows.Controls.Grid]::SetColumn($textbox, 1)
-                $inputControl = $textbox
-            }
-
             # Check if parameter has enum values (dropdown)
-            elseif ($param.enum -and $param.enum.Count -gt 0) {
+            if ($param.enum -and $param.enum.Count -gt 0) {
                 $comboBox = New-Object System.Windows.Controls.ComboBox
                 $comboBox.MinWidth = 360
                 $comboBox.HorizontalAlignment = "Stretch"
@@ -6775,13 +6754,13 @@ $methodCombo.Add_SelectionChanged({
                     $textbox | Add-Member -NotePropertyName "ValidationText" -NotePropertyValue $validationText
 
                     $textbox.Add_TextChanged({
-                            param($sender, $e)
-                            $text = $sender.Text.Trim()
-                            $validationTextBlock = $sender.ValidationText
+                            param($zsender, $e)
+                            $text = $zsender.Text.Trim()
+                            $validationTextBlock = $zsender.ValidationText
 
                             if ([string]::IsNullOrWhiteSpace($text)) {
-                                $sender.BorderBrush = $null
-                                $sender.BorderThickness = New-Object System.Windows.Thickness 1
+                                $zsender.BorderBrush = $null
+                                $zsender.BorderThickness = New-Object System.Windows.Thickness 1
                                 $validationTextBlock.Visibility = "Collapsed"
                             }
                             else {
@@ -6789,26 +6768,26 @@ $methodCombo.Add_SelectionChanged({
                                 $errorMsg = ""
 
                                 # Validate numeric types
-                                if ($sender.ParamType -in @("integer", "number")) {
-                                    $testResult = Test-NumericValue -Value $text -Type $sender.ParamType -Minimum $sender.ParamMinimum -Maximum $sender.ParamMaximum
+                                if ($zsender.ParamType -in @("integer", "number")) {
+                                    $testResult = Test-NumericValue -Value $text -Type $zsender.ParamType -Minimum $zsender.ParamMinimum -Maximum $zsender.ParamMaximum
                                     $isValid = $testResult.IsValid
                                     $errorMsg = $testResult.ErrorMessage
                                 }
                                 # Validate string formats
-                                elseif ($sender.ParamFormat -or $sender.ParamPattern) {
-                                    $testResult = Test-StringFormat -Value $text -Format $sender.ParamFormat -Pattern $sender.ParamPattern
+                                elseif ($zsender.ParamFormat -or $zsender.ParamPattern) {
+                                    $testResult = Test-StringFormat -Value $text -Format $zsender.ParamFormat -Pattern $zsender.ParamPattern
                                     $isValid = $testResult.IsValid
                                     $errorMsg = $testResult.ErrorMessage
                                 }
 
                                 if ($isValid) {
-                                    $sender.BorderBrush = [System.Windows.Media.Brushes]::Green
-                                    $sender.BorderThickness = New-Object System.Windows.Thickness 2
+                                    $zsender.BorderBrush = [System.Windows.Media.Brushes]::Green
+                                    $zsender.BorderThickness = New-Object System.Windows.Thickness 2
                                     $validationTextBlock.Visibility = "Collapsed"
                                 }
                                 else {
-                                    $sender.BorderBrush = [System.Windows.Media.Brushes]::Red
-                                    $sender.BorderThickness = New-Object System.Windows.Thickness 2
+                                    $zsender.BorderBrush = [System.Windows.Media.Brushes]::Red
+                                    $zsender.BorderThickness = New-Object System.Windows.Thickness 2
                                     $validationTextBlock.Text = "✗ " + $errorMsg
                                     $validationTextBlock.Foreground = [System.Windows.Media.Brushes]::Red
                                     $validationTextBlock.Visibility = "Visible"
@@ -7149,11 +7128,11 @@ if ($testTokenButton) {
                 }
                 $testUrl = "$ApiBaseUrl/api/v2/users/me"
 
-		                $response = Invoke-GCRequest -Method GET -Uri $testUrl -Headers $headers -AsResponse
+                $response = Invoke-GCRequest -Method GET -Uri $testUrl -Headers $headers -AsResponse
 
-		                if ($response.StatusCode -eq 200) {
-		                    $script:TokenValidated = $true
-                            Update-AuthUiState
+                if ($response.StatusCode -eq 200) {
+                    $script:TokenValidated = $true
+                    Update-AuthUiState
                     Add-LogEntry "Token test successful: Token is valid."
                 }
                 else {
@@ -7492,12 +7471,12 @@ function Refresh-InsightBriefingHistory {
             $htmlLeaf = [string]$entry.Html
 
             $historyEntry = [pscustomobject]@{
-                Timestamp       = $timestamp
-                Pack            = $packLabel
-                Snapshot        = $snapshotLeaf
-                Html            = $htmlLeaf
-                SnapshotPath    = if ($snapshotLeaf) { Join-Path -Path $outputDir -ChildPath $snapshotLeaf } else { $null }
-                HtmlPath        = if ($htmlLeaf) { Join-Path -Path $outputDir -ChildPath $htmlLeaf } else { $null }
+                Timestamp    = $timestamp
+                Pack         = $packLabel
+                Snapshot     = $snapshotLeaf
+                Html         = $htmlLeaf
+                SnapshotPath = if ($snapshotLeaf) { Join-Path -Path $outputDir -ChildPath $snapshotLeaf } else { $null }
+                HtmlPath     = if ($htmlLeaf) { Join-Path -Path $outputDir -ChildPath $htmlLeaf } else { $null }
             }
             $script:InsightBriefingsHistory.Add($historyEntry) | Out-Null
         }
@@ -7518,7 +7497,8 @@ if ($openBriefingsFolderButton) {
             try {
                 $dir = Get-InsightBriefingDirectory
                 if ($dir) { Start-Process -FilePath $dir }
-            } catch {}
+            }
+            catch {}
         })
 }
 
@@ -7575,17 +7555,17 @@ if ($insightPackCombo) {
         }
     }
 
-	    $insightPackCombo.Add_SelectionChanged({
+    $insightPackCombo.Add_SelectionChanged({
             $selected = $insightPackCombo.SelectedItem
             if (-not $selected) { return }
 
             if ($insightPackDescriptionText) {
                 $insightPackDescriptionText.Text = if ($selected.Description) { $selected.Description } else { $selected.Id }
             }
-	            if ($insightPackMetaText) {
+            if ($insightPackMetaText) {
                 $tags = if ($selected.Tags -and $selected.Tags.Count -gt 0) { ($selected.Tags -join ', ') } else { '' }
                 $scopes = if ($selected.Scopes -and $selected.Scopes.Count -gt 0) { ($selected.Scopes -join ', ') } else { '' }
-                    $endpoints = if ($selected.Endpoints -and $selected.Endpoints.Count -gt 0) { ($selected.Endpoints -join "`n") } else { '' }
+                $endpoints = if ($selected.Endpoints -and $selected.Endpoints.Count -gt 0) { ($selected.Endpoints -join "`n") } else { '' }
 
                 $lines = New-Object System.Collections.Generic.List[string]
                 if ($selected.Version) { $lines.Add("Version: $($selected.Version)") | Out-Null }
@@ -7599,56 +7579,56 @@ if ($insightPackCombo) {
                     $lines.Add("Endpoints:") | Out-Null
                     $lines.Add($endpoints) | Out-Null
                 }
-	                if ($selected.Examples -and $selected.Examples.Count -gt 0) {
-	                    $lines.Add("Examples:") | Out-Null
-	                    foreach ($ex in @($selected.Examples)) {
-	                        if (-not $ex) { continue }
-	                        $note = if ($ex.Notes) { " — $($ex.Notes)" } else { '' }
-	                        $lines.Add("  - $($ex.Title)$note") | Out-Null
-	                    }
-	                }
-	                $insightPackMetaText.Text = ($lines -join "`n")
-	            }
+                if ($selected.Examples -and $selected.Examples.Count -gt 0) {
+                    $lines.Add("Examples:") | Out-Null
+                    foreach ($ex in @($selected.Examples)) {
+                        if (-not $ex) { continue }
+                        $note = if ($ex.Notes) { " — $($ex.Notes)" } else { '' }
+                        $lines.Add("  - $($ex.Title)$note") | Out-Null
+                    }
+                }
+                $insightPackMetaText.Text = ($lines -join "`n")
+            }
             if ($insightPackParametersPanel) {
                 Render-InsightPackParameters -Pack $selected.Pack -Panel $insightPackParametersPanel
             }
 
-	            if ($insightPackWarningsText) {
-	                $warnings = New-Object System.Collections.Generic.List[string]
-	                if ($selected.Scopes -and $selected.Scopes.Count -gt 0) {
-	                    $warnings.Add("Requires OAuth scopes: $($selected.Scopes -join ', ')") | Out-Null
-	                }
-	                if ($warnings.Count -eq 0) {
-	                    $warnings.Add("No required scopes declared by this pack.") | Out-Null
-	                }
+            if ($insightPackWarningsText) {
+                $warnings = New-Object System.Collections.Generic.List[string]
+                if ($selected.Scopes -and $selected.Scopes.Count -gt 0) {
+                    $warnings.Add("Requires OAuth scopes: $($selected.Scopes -join ', ')") | Out-Null
+                }
+                if ($warnings.Count -eq 0) {
+                    $warnings.Add("No required scopes declared by this pack.") | Out-Null
+                }
 
-	                # Optional strict validation (surface issues early without blocking selection)
-	                try {
-	                    Ensure-OpsInsightsModuleLoaded
-	                    $strict = $false
-	                    if ($strictInsightValidationCheckbox) { $strict = [bool]$strictInsightValidationCheckbox.IsChecked }
-	                    $validation = Test-GCInsightPack -PackPath $selected.FullPath -Strict:$strict
-	                    if ($validation -and -not $validation.IsValid -and $validation.Errors -and $validation.Errors.Count -gt 0) {
-	                        $warnings.Add("Validation: $($validation.Errors[0])") | Out-Null
-	                    }
-	                }
-	                catch {
-	                    $warnings.Add("Validation: $($_.Exception.Message)") | Out-Null
-	                }
-	                $insightPackWarningsText.Text = ($warnings -join "`n")
-	            }
+                # Optional strict validation (surface issues early without blocking selection)
+                try {
+                    Ensure-OpsInsightsModuleLoaded
+                    $strict = $false
+                    if ($strictInsightValidationCheckbox) { $strict = [bool]$strictInsightValidationCheckbox.IsChecked }
+                    $validation = Test-GCInsightPack -PackPath $selected.FullPath -Strict:$strict
+                    if ($validation -and -not $validation.IsValid -and $validation.Errors -and $validation.Errors.Count -gt 0) {
+                        $warnings.Add("Validation: $($validation.Errors[0])") | Out-Null
+                    }
+                }
+                catch {
+                    $warnings.Add("Validation: $($_.Exception.Message)") | Out-Null
+                }
+                $insightPackWarningsText.Text = ($warnings -join "`n")
+            }
 
-	            if ($insightPackExampleCombo) {
-	                $insightPackExampleCombo.ItemsSource = @($selected.Examples)
-	                $insightPackExampleCombo.DisplayMemberPath = 'Title'
-	                $insightPackExampleCombo.IsEnabled = ($selected.Examples -and $selected.Examples.Count -gt 0)
-	                if ($insightPackExampleCombo.IsEnabled) { $insightPackExampleCombo.SelectedIndex = 0 }
-	            }
-	            if ($loadInsightPackExampleButton) {
-	                $loadInsightPackExampleButton.IsEnabled = ($selected.Examples -and $selected.Examples.Count -gt 0)
-	            }
+            if ($insightPackExampleCombo) {
+                $insightPackExampleCombo.ItemsSource = @($selected.Examples)
+                $insightPackExampleCombo.DisplayMemberPath = 'Title'
+                $insightPackExampleCombo.IsEnabled = ($selected.Examples -and $selected.Examples.Count -gt 0)
+                if ($insightPackExampleCombo.IsEnabled) { $insightPackExampleCombo.SelectedIndex = 0 }
+            }
+            if ($loadInsightPackExampleButton) {
+                $loadInsightPackExampleButton.IsEnabled = ($selected.Examples -and $selected.Examples.Count -gt 0)
+            }
 
-	            # Apply global defaults (only if the pack defines these params and the controls are empty)
+            # Apply global defaults (only if the pack defines these params and the controls are empty)
             if ($script:InsightParamInputs.ContainsKey('startDate') -and $insightGlobalStartInput -and -not [string]::IsNullOrWhiteSpace($insightGlobalStartInput.Text)) {
                 $ctrl = $script:InsightParamInputs['startDate']
                 if ($ctrl -is [System.Windows.Controls.TextBox] -and [string]::IsNullOrWhiteSpace($ctrl.Text)) {
@@ -7663,10 +7643,10 @@ if ($insightPackCombo) {
             }
         })
 
-	    if ($script:InsightPackCatalog.Count -gt 0) {
-	        $insightPackCombo.SelectedIndex = 0
-	    }
-	}
+    if ($script:InsightPackCatalog.Count -gt 0) {
+        $insightPackCombo.SelectedIndex = 0
+    }
+}
 
 if ($insightTimePresetCombo) {
     $insightTimePresetCombo.ItemsSource = @(Get-InsightTimePresets)
@@ -7789,14 +7769,14 @@ function Run-SelectedInsightPack {
     Ensure-OpsInsightsContext
     $packParams = Get-InsightPackParameterValues
 
-	    $useCache = $false
-	    if ($useInsightCacheCheckbox) { $useCache = [bool]$useInsightCacheCheckbox.IsChecked }
-	    $strictValidate = $false
-	    if ($strictInsightValidationCheckbox) { $strictValidate = [bool]$strictInsightValidationCheckbox.IsChecked }
-	    $cacheTtl = 60
-	    if ($insightCacheTtlInput -and -not [string]::IsNullOrWhiteSpace($insightCacheTtlInput.Text)) {
-	        try { $cacheTtl = [int]$insightCacheTtlInput.Text.Trim() } catch { $cacheTtl = 60 }
-	    }
+    $useCache = $false
+    if ($useInsightCacheCheckbox) { $useCache = [bool]$useInsightCacheCheckbox.IsChecked }
+    $strictValidate = $false
+    if ($strictInsightValidationCheckbox) { $strictValidate = [bool]$strictInsightValidationCheckbox.IsChecked }
+    $cacheTtl = 60
+    if ($insightCacheTtlInput -and -not [string]::IsNullOrWhiteSpace($insightCacheTtlInput.Text)) {
+        try { $cacheTtl = [int]$insightCacheTtlInput.Text.Trim() } catch { $cacheTtl = 60 }
+    }
     if ($cacheTtl -lt 1) { $cacheTtl = 1 }
 
     $cacheDir = Join-Path -Path $UserProfileBase -ChildPath "GenesysApiExplorerCache\\OpsInsights"
@@ -7804,31 +7784,31 @@ function Run-SelectedInsightPack {
         New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
     }
 
-	    if ($Compare) {
-	        $baselineKey = if ($insightBaselineModeCombo) { [string]$insightBaselineModeCombo.SelectedValue } else { 'PreviousWindow' }
-	        if ($baselineKey -eq 'ShiftDays7') {
-	            $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -BaselineMode ShiftDays -BaselineShiftDays 7 -StrictValidation:$strictValidate
-	        }
-	        elseif ($baselineKey -eq 'ShiftDays30') {
-	            $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -BaselineMode ShiftDays -BaselineShiftDays 30 -StrictValidation:$strictValidate
-	        }
-	        else {
-	            $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -BaselineMode PreviousWindow -StrictValidation:$strictValidate
-	        }
-	    }
-	    else {
-	        if ($DryRun) {
-	            $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -DryRun -StrictValidation:$strictValidate
-	        }
-	        else {
-	            if ($useCache) {
-	                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -UseCache -CacheTtlMinutes $cacheTtl -CacheDirectory $cacheDir -StrictValidation:$strictValidate
-	            }
-	            else {
-	                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -StrictValidation:$strictValidate
-	            }
-	        }
-	    }
+    if ($Compare) {
+        $baselineKey = if ($insightBaselineModeCombo) { [string]$insightBaselineModeCombo.SelectedValue } else { 'PreviousWindow' }
+        if ($baselineKey -eq 'ShiftDays7') {
+            $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -BaselineMode ShiftDays -BaselineShiftDays 7 -StrictValidation:$strictValidate
+        }
+        elseif ($baselineKey -eq 'ShiftDays30') {
+            $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -BaselineMode ShiftDays -BaselineShiftDays 30 -StrictValidation:$strictValidate
+        }
+        else {
+            $result = Invoke-GCInsightPackCompare -PackPath $packPath -Parameters $packParams -BaselineMode PreviousWindow -StrictValidation:$strictValidate
+        }
+    }
+    else {
+        if ($DryRun) {
+            $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -DryRun -StrictValidation:$strictValidate
+        }
+        else {
+            if ($useCache) {
+                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -UseCache -CacheTtlMinutes $cacheTtl -CacheDirectory $cacheDir -StrictValidation:$strictValidate
+            }
+            else {
+                $result = Invoke-GCInsightPack -PackPath $packPath -Parameters $packParams -StrictValidation:$strictValidate
+            }
+        }
+    }
 
     $script:LastInsightResult = $result
     Update-InsightPackUi -Result $result
@@ -7919,11 +7899,11 @@ if ($exportInsightBriefingButton) {
 }
 
 # Export PowerShell Script button
-	if ($exportPowerShellButton) {
-		    $exportPowerShellButton.Add_Click({
-	            $selectedPath = $pathCombo.SelectedItem
-	            $selectedMethod = $methodCombo.SelectedItem
-	            $token = Get-ExplorerAccessToken
+if ($exportPowerShellButton) {
+    $exportPowerShellButton.Add_Click({
+            $selectedPath = $pathCombo.SelectedItem
+            $selectedMethod = $methodCombo.SelectedItem
+            $token = Get-ExplorerAccessToken
 
             if (-not $selectedPath -or -not $selectedMethod) {
                 $statusText.Text = "Select a path and method first."
@@ -7936,9 +7916,9 @@ if ($exportInsightBriefingButton) {
             $methodObject = Get-MethodObject -PathObject $pathObject -MethodName $selectedMethod
             if ($methodObject -and $methodObject.parameters) {
                 foreach ($param in $methodObject.parameters) {
-                    $input = $paramInputs[$param.name]
-                    if ($input) {
-                        $value = Get-ParameterControlValue -Control $input
+                    $yinput = $paramInputs[$param.name]
+                    if ($yinput) {
+                        $value = Get-ParameterControlValue -Control $yinput
                         if (-not [string]::IsNullOrWhiteSpace($value)) {
                             $requestParams[$param.name] = $value
                         }
@@ -7946,19 +7926,20 @@ if ($exportInsightBriefingButton) {
                 }
             }
 
-	            $mode = 'Auto'
-	            try {
-	                if ($powerShellExportModeCombo -and $powerShellExportModeCombo.SelectedIndex -ge 0) {
-	                    switch ([int]$powerShellExportModeCombo.SelectedIndex) {
-	                        1 { $mode = 'Portable' }
-	                        2 { $mode = 'OpsInsights' }
-	                        default { $mode = 'Auto' }
-	                    }
-	                }
-	            } catch { $mode = 'Auto' }
+            $mode = 'Auto'
+            try {
+                if ($powerShellExportModeCombo -and $powerShellExportModeCombo.SelectedIndex -ge 0) {
+                    switch ([int]$powerShellExportModeCombo.SelectedIndex) {
+                        1 { $mode = 'Portable' }
+                        2 { $mode = 'OpsInsights' }
+                        default { $mode = 'Auto' }
+                    }
+                }
+            }
+            catch { $mode = 'Auto' }
 
-	            # Generate PowerShell script
-		            $script = Export-PowerShellScript -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token -Region $script:Region -Mode $mode
+            # Generate PowerShell script
+            $script = Export-PowerShellScript -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token -Region $script:Region -Mode $mode
 
             # Show in dialog with copy/save options
             $dialog = New-Object Microsoft.Win32.SaveFileDialog
@@ -7985,10 +7966,10 @@ if ($exportInsightBriefingButton) {
 
 # Export cURL Command button
 if ($exportCurlButton) {
-	    $exportCurlButton.Add_Click({
-	            $selectedPath = $pathCombo.SelectedItem
-	            $selectedMethod = $methodCombo.SelectedItem
-	            $token = Get-ExplorerAccessToken
+    $exportCurlButton.Add_Click({
+            $selectedPath = $pathCombo.SelectedItem
+            $selectedMethod = $methodCombo.SelectedItem
+            $token = Get-ExplorerAccessToken
 
             if (-not $selectedPath -or -not $selectedMethod) {
                 $statusText.Text = "Select a path and method first."
@@ -8001,9 +7982,9 @@ if ($exportCurlButton) {
             $methodObject = Get-MethodObject -PathObject $pathObject -MethodName $selectedMethod
             if ($methodObject -and $methodObject.parameters) {
                 foreach ($param in $methodObject.parameters) {
-                    $input = $paramInputs[$param.name]
-                    if ($input) {
-                        $value = Get-ParameterControlValue -Control $input
+                    $xinput = $paramInputs[$param.name]
+                    if ($xinput) {
+                        $value = Get-ParameterControlValue -Control $xinput
                         if (-not [string]::IsNullOrWhiteSpace($value)) {
                             $requestParams[$param.name] = $value
                         }
@@ -8012,7 +7993,7 @@ if ($exportCurlButton) {
             }
 
             # Generate cURL command
-	            $curlCommand = Export-CurlCommand -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token -Region $script:Region
+            $curlCommand = Export-CurlCommand -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token -Region $script:Region
 
             # Copy to clipboard and show confirmation
             [System.Windows.Clipboard]::SetText($curlCommand)
@@ -8040,7 +8021,8 @@ if ($templatesList) {
             if ($TemplatesFilePath -and (Test-Path -LiteralPath $TemplatesFilePath)) {
                 $defaultLastModified = (Get-Item -LiteralPath $TemplatesFilePath).LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
             }
-        } catch { }
+        }
+        catch { }
 
         $normalizedTemplates = Normalize-Templates -Templates $TemplatesData -DefaultLastModified $defaultLastModified
         foreach ($template in $normalizedTemplates) {
@@ -8052,7 +8034,8 @@ if ($templatesList) {
             if ($TemplatesFilePath -and (Test-Path -LiteralPath $TemplatesFilePath)) {
                 Save-TemplatesToDisk -Path $TemplatesFilePath -Templates $script:Templates
             }
-        } catch { }
+        }
+        catch { }
     }
 
     $templatesList.Add_SelectionChanged({
@@ -8111,9 +8094,9 @@ if ($saveTemplateButton) {
             $methodObject = Get-MethodObject -PathObject $pathObject -MethodName $selectedMethod
             if ($methodObject -and $methodObject.parameters) {
                 foreach ($param in $methodObject.parameters) {
-                    $input = $paramInputs[$param.name]
-                    if ($input) {
-                        $value = Get-ParameterControlValue -Control $input
+                    $einput = $paramInputs[$param.name]
+                    if ($einput) {
+                        $value = Get-ParameterControlValue -Control $einput
                         if (-not [string]::IsNullOrWhiteSpace($value)) {
                             $requestParams[$param.name] = $value
                         }
@@ -8123,12 +8106,12 @@ if ($saveTemplateButton) {
 
             # Create template object
             $template = [PSCustomObject]@{
-                Name       = $templateName
-                Method     = $selectedMethod
-                Path       = $selectedPath
-                Group      = $groupCombo.SelectedItem
-                Parameters = $requestParams
-                Created    = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+                Name         = $templateName
+                Method       = $selectedMethod
+                Path         = $selectedPath
+                Group        = $groupCombo.SelectedItem
+                Parameters   = $requestParams
+                Created      = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
                 LastModified = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
             }
 
@@ -8309,9 +8292,9 @@ $btnSubmit.Add_Click({
         # Validate required parameters and JSON body parameters
         $validationErrors = @()
         foreach ($param in $params) {
-            $input = $paramInputs[$param.name]
-            if ($input) {
-                $value = Get-ParameterControlValue -Control $input
+            $ainput = $paramInputs[$param.name]
+            if ($ainput) {
+                $value = Get-ParameterControlValue -Control $ainput
                 if ($value -and $value.GetType().Name -eq "String") {
                     $value = $value.Trim()
                 }
@@ -8391,10 +8374,10 @@ $btnSubmit.Add_Click({
         }
 
         foreach ($param in $params) {
-            $input = $paramInputs[$param.name]
-            if (-not $input) { continue }
+            $rinput = $paramInputs[$param.name]
+            if (-not $rinput) { continue }
 
-            $value = Get-ParameterControlValue -Control $input
+            $value = Get-ParameterControlValue -Control $rinput
             if ($value -and $value.GetType().Name -eq "String") {
                 $value = $value.Trim()
             }
@@ -8440,9 +8423,9 @@ $btnSubmit.Add_Click({
         # Store parameters for history
         $requestParams = @{}
         foreach ($param in $params) {
-            $input = $paramInputs[$param.name]
-            if ($input) {
-                $value = Get-ParameterControlValue -Control $input
+            $rinput = $paramInputs[$param.name]
+            if ($rinput) {
+                $value = Get-ParameterControlValue -Control $rinput
                 if ($value -and $value.GetType().Name -eq "String") {
                     $value = $value.Trim()
                 }
@@ -8452,12 +8435,12 @@ $btnSubmit.Add_Click({
             }
         }
 
-	        try {
-	            $response = Invoke-GCRequest -Method $selectedMethod.ToUpper() -Uri $fullUrl -Headers $headers -Body $body -AsResponse
-	            $rawContent = $response.Content
-	            $formattedContent = $rawContent
-	            try {
-	                $json = $rawContent | ConvertFrom-Json -ErrorAction Stop
+        try {
+            $response = Invoke-GCRequest -Method $selectedMethod.ToUpper() -Uri $fullUrl -Headers $headers -Body $body -AsResponse
+            $rawContent = $response.Content
+            $formattedContent = $rawContent
+            try {
+                $json = $rawContent | ConvertFrom-Json -ErrorAction Stop
                 $formattedContent = $json | ConvertTo-Json -Depth 10
             }
             catch {
