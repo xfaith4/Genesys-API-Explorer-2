@@ -5947,8 +5947,8 @@ $Xaml = @"
           </Grid>
         </Grid>
       </TabItem>
-      <TabItem Header="Conversation Report">
-        <Grid Margin="10">
+	      <TabItem Header="Conversation Report">
+	        <Grid Margin="10">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -5983,12 +5983,57 @@ $Xaml = @"
                    VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" IsReadOnly="True"
                    FontFamily="Consolas" FontSize="11"
                    VerticalAlignment="Stretch" MinHeight="200"/>
-        </Grid>
-      </TabItem>
-    </TabControl>
-  </Grid>
-</DockPanel>
-</Window>
+	        </Grid>
+	      </TabItem>
+	      <TabItem Header="Queue Wait Coverage">
+	        <Grid Margin="10">
+	          <Grid.RowDefinitions>
+	            <RowDefinition Height="Auto"/>
+	            <RowDefinition Height="Auto"/>
+	            <RowDefinition Height="*"/>
+	          </Grid.RowDefinitions>
+
+	          <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0 0 0 10">
+	            <TextBlock Text="Queue ID:" VerticalAlignment="Center" FontWeight="Bold" Margin="0 0 8 0"/>
+	            <TextBox Name="QueueWaitQueueIdInput" Width="320" Height="28" VerticalContentAlignment="Center"
+	                     ToolTip="Enter the Genesys Cloud Queue ID to analyze."/>
+	            <TextBlock Text="Interval:" VerticalAlignment="Center" FontWeight="Bold" Margin="16 0 8 0"/>
+	            <TextBox Name="QueueWaitIntervalInput" Width="420" Height="28" VerticalContentAlignment="Center"
+	                     ToolTip="Analytics interval (UTC), format: yyyy-MM-ddTHH:mm:ss.fffZ/yyyy-MM-ddTHH:mm:ss.fffZ"/>
+	            <Button Name="RunQueueWaitReportButton" Width="120" Height="30" Content="Run Report" Margin="10 0 0 0"/>
+	          </StackPanel>
+
+	          <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0 0 0 10">
+	            <TextBlock Name="QueueWaitReportStatus" VerticalAlignment="Center" Foreground="SlateGray"/>
+	          </StackPanel>
+
+	          <Grid Grid.Row="2">
+	            <Grid.RowDefinitions>
+	              <RowDefinition Height="2*"/>
+	              <RowDefinition Height="*"/>
+	            </Grid.RowDefinitions>
+	            <ListView Grid.Row="0" Name="QueueWaitResultsList"
+	                      VirtualizingStackPanel.IsVirtualizing="True"
+	                      VirtualizingStackPanel.VirtualizationMode="Recycling">
+	              <ListView.View>
+	                <GridView>
+	                  <GridViewColumn Header="ConversationId" DisplayMemberBinding="{Binding ConversationId}" Width="280"/>
+	                  <GridViewColumn Header="WaitingSince (UTC)" DisplayMemberBinding="{Binding WaitingSinceUtc}" Width="170"/>
+	                  <GridViewColumn Header="Required Skills" DisplayMemberBinding="{Binding RequiredSkills}" Width="320"/>
+	                  <GridViewColumn Header="Eligible Agents" DisplayMemberBinding="{Binding EligibleAgentsSummary}" Width="220"/>
+	                </GridView>
+	              </ListView.View>
+	            </ListView>
+	            <TextBox Grid.Row="1" Name="QueueWaitDetailsText" TextWrapping="Wrap" AcceptsReturn="True"
+	                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" IsReadOnly="True"
+	                     FontFamily="Consolas" FontSize="11" Margin="0 10 0 0"/>
+	          </Grid>
+	        </Grid>
+	      </TabItem>
+	    </TabControl>
+	  </Grid>
+	</DockPanel>
+	</Window>
 "@
 
 $Window = [System.Windows.Markup.XamlReader]::Parse($Xaml)
@@ -6035,14 +6080,20 @@ $runConversationReportButton = $Window.FindName("RunConversationReportButton")
 $inspectConversationReportButton = $Window.FindName("InspectConversationReportButton")
 $exportConversationReportJsonButton = $Window.FindName("ExportConversationReportJsonButton")
 $exportConversationReportTextButton = $Window.FindName("ExportConversationReportTextButton")
-$conversationReportText = $Window.FindName("ConversationReportText")
-$conversationReportStatus = $Window.FindName("ConversationReportStatus")
-$conversationReportProgressBar = $Window.FindName("ConversationReportProgressBar")
-$conversationReportProgressText = $Window.FindName("ConversationReportProgressText")
-	$conversationReportEndpointLog = $Window.FindName("ConversationReportEndpointLog")
-	$appSettingsMenuItem = $Window.FindName("AppSettingsMenuItem")
-	$traceMenuItem = $Window.FindName("TraceMenuItem")
-	$settingsMenuItem = $Window.FindName("SettingsMenuItem")
+	$conversationReportText = $Window.FindName("ConversationReportText")
+	$conversationReportStatus = $Window.FindName("ConversationReportStatus")
+	$conversationReportProgressBar = $Window.FindName("ConversationReportProgressBar")
+	$conversationReportProgressText = $Window.FindName("ConversationReportProgressText")
+		$conversationReportEndpointLog = $Window.FindName("ConversationReportEndpointLog")
+	$queueWaitQueueIdInput = $Window.FindName("QueueWaitQueueIdInput")
+	$queueWaitIntervalInput = $Window.FindName("QueueWaitIntervalInput")
+	$runQueueWaitReportButton = $Window.FindName("RunQueueWaitReportButton")
+	$queueWaitReportStatus = $Window.FindName("QueueWaitReportStatus")
+	$queueWaitResultsList = $Window.FindName("QueueWaitResultsList")
+	$queueWaitDetailsText = $Window.FindName("QueueWaitDetailsText")
+		$appSettingsMenuItem = $Window.FindName("AppSettingsMenuItem")
+		$traceMenuItem = $Window.FindName("TraceMenuItem")
+		$settingsMenuItem = $Window.FindName("SettingsMenuItem")
 	$exportLogButton = $Window.FindName("ExportLogButton")
 	$clearLogButton = $Window.FindName("ClearLogButton")
 	$resetEndpointsMenuItem = $Window.FindName("ResetEndpointsMenuItem")
@@ -6288,6 +6339,7 @@ $script:InsightMetrics = New-Object System.Collections.ObjectModel.ObservableCol
 $script:InsightDrilldowns = New-Object System.Collections.ObjectModel.ObservableCollection[Object]
 $script:LastInsightResult = $null
 $script:InsightBriefingsHistory = New-Object System.Collections.ObjectModel.ObservableCollection[Object]
+$script:QueueWaitResults = New-Object System.Collections.ObjectModel.ObservableCollection[Object]
 
 function Invoke-ReloadEndpoints {
     param (
@@ -7626,6 +7678,37 @@ if ($insightBriefingPathText -and $insightBriefingRoot) {
     $insightBriefingPathText.Text = "Briefings folder: $insightBriefingRoot"
 }
 
+if ($queueWaitResultsList) {
+    $queueWaitResultsList.ItemsSource = $script:QueueWaitResults
+}
+
+if ($queueWaitIntervalInput -and [string]::IsNullOrWhiteSpace($queueWaitIntervalInput.Text)) {
+    try { $queueWaitIntervalInput.Text = Get-DefaultAnalyticsIntervalLastMinutes -Minutes 30 } catch { }
+}
+
+if ($queueWaitResultsList -and $queueWaitDetailsText) {
+    $queueWaitResultsList.Add_SelectionChanged({
+            try {
+                $selected = $queueWaitResultsList.SelectedItem
+                if (-not $selected) { $queueWaitDetailsText.Text = ''; return }
+
+                $lines = New-Object System.Collections.Generic.List[string]
+                $lines.Add("ConversationId: $($selected.ConversationId)") | Out-Null
+                $lines.Add("WaitingSinceUtc: $($selected.WaitingSinceUtc)") | Out-Null
+                $lines.Add("RequiredSkills: $($selected.RequiredSkills)") | Out-Null
+                $lines.Add("EligibleAgents ($(@($selected.EligibleAgentNames).Count)):" ) | Out-Null
+                foreach ($n in @($selected.EligibleAgentNames | Select-Object -First 50)) {
+                    $lines.Add("  - $n") | Out-Null
+                }
+                if (@($selected.EligibleAgentNames).Count -gt 50) { $lines.Add("  ...") | Out-Null }
+                $queueWaitDetailsText.Text = ($lines -join "`n")
+            }
+            catch {
+                $queueWaitDetailsText.Text = "Failed to render details: $($_.Exception.Message)"
+            }
+        })
+}
+
 function Refresh-InsightBriefingHistory {
     $outputDir = Get-InsightBriefingDirectory
     $indexPath = Join-Path -Path $outputDir -ChildPath 'index.json'
@@ -8042,6 +8125,305 @@ function Run-SelectedInsightPack {
     return $result
 }
 
+function Get-DefaultAnalyticsIntervalLastMinutes {
+    param(
+        [Parameter()]
+        [int]$Minutes = 30
+    )
+
+    if ($Minutes -lt 1) { $Minutes = 1 }
+    $end = (Get-Date).ToUniversalTime()
+    $start = $end.AddMinutes(-1 * $Minutes)
+    return ("{0}/{1}" -f $start.ToString('yyyy-MM-ddTHH:mm:ss.fffZ'), $end.ToString('yyyy-MM-ddTHH:mm:ss.fffZ'))
+}
+
+function Normalize-AnalyticsInterval {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Interval
+    )
+
+    $value = $Interval.Trim()
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        throw "Interval is required."
+    }
+
+    $parts = $value -split '/'
+    if ($parts.Count -ne 2) {
+        throw "Interval must be in the form start/end (UTC), e.g. 2025-12-01T00:00:00.000Z/2025-12-08T00:00:00.000Z"
+    }
+
+    $start = [datetimeoffset]::Parse($parts[0].Trim(), [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal).ToUniversalTime()
+    $end = [datetimeoffset]::Parse($parts[1].Trim(), [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal).ToUniversalTime()
+    if ($end -le $start) { throw "Interval end must be greater than start." }
+
+    return ("{0}/{1}" -f $start.ToString('yyyy-MM-ddTHH:mm:ss.fffZ'), $end.ToString('yyyy-MM-ddTHH:mm:ss.fffZ'))
+}
+
+function Get-RoutingSkillNameMap {
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$SkillIds
+    )
+
+    $map = @{}
+    $unique = @($SkillIds | Where-Object { $_ } | ForEach-Object { [string]$_ } | Sort-Object -Unique)
+    if ($unique.Count -eq 0) { return $map }
+
+    $token = Get-ExplorerAccessToken
+    if ([string]::IsNullOrWhiteSpace($token)) { return $map }
+
+    # Genesys supports repeated `id` query params: .../routing/skills?id=a&id=b
+    $batchSize = 50
+    for ($i = 0; $i -lt $unique.Count; $i += $batchSize) {
+        $batch = $unique[$i..([Math]::Min($i + $batchSize - 1, $unique.Count - 1))]
+        $qs = ($batch | ForEach-Object { "id=$([uri]::EscapeDataString($_))" }) -join '&'
+        $path = "/api/v2/routing/skills?pageSize=100&$qs"
+        try {
+            $resp = Invoke-GCRequest -Method 'GET' -BaseUri $ApiBaseUrl -AccessToken ($token.Trim()) -Path $path
+            foreach ($ent in @($resp.entities)) {
+                $id = $null
+                $name = $null
+                try { $id = [string]$ent.id } catch { $id = $null }
+                try { $name = [string]$ent.name } catch { $name = $null }
+                if ($id -and $name) { $map[$id] = $name }
+            }
+        }
+        catch {
+            Write-TraceLog "Get-RoutingSkillNameMap failed: $($_.Exception.Message)"
+        }
+    }
+
+    return $map
+}
+
+function Get-QueueMembersWithSkills {
+    param(
+        [Parameter(Mandatory)]
+        [string]$QueueId
+    )
+
+    $token = Get-ExplorerAccessToken
+    if ([string]::IsNullOrWhiteSpace($token)) {
+        throw "Please provide an OAuth token first."
+    }
+
+    $members = New-Object System.Collections.Generic.List[object]
+    $page = 1
+    $pageSize = 100
+    $maxPages = 25
+
+    for ($i = 0; $i -lt $maxPages; $i++) {
+        $path = "/api/v2/routing/queues/$QueueId/members?pageSize=$pageSize&pageNumber=$page&sortOrder=asc&expand=skills"
+        $resp = Invoke-GCRequest -Method 'GET' -BaseUri $ApiBaseUrl -AccessToken ($token.Trim()) -Path $path
+        $entities = @()
+        try { $entities = @($resp.entities) } catch { $entities = @() }
+
+        foreach ($entity in $entities) {
+            # Entity shape differs by API version; handle { member = {id,name,skills}} and { user = ... } and { id,name,skills }.
+            $userObj = $null
+            if ($entity.PSObject.Properties.Name -contains 'member' -and $entity.member) { $userObj = $entity.member }
+            elseif ($entity.PSObject.Properties.Name -contains 'user' -and $entity.user) { $userObj = $entity.user }
+            else { $userObj = $entity }
+
+            $userId = $null
+            $userName = $null
+            try { $userId = [string]$userObj.id } catch { $userId = $null }
+            try { $userName = [string]$userObj.name } catch { $userName = $null }
+            if ([string]::IsNullOrWhiteSpace($userId)) { continue }
+            if ([string]::IsNullOrWhiteSpace($userName)) { $userName = $userId }
+
+            $skillIds = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::OrdinalIgnoreCase)
+            foreach ($s in @($userObj.skills)) {
+                if (-not $s) { continue }
+                $sid = $null
+                try { $sid = [string]$s.id } catch { $sid = $null }
+                if (-not $sid) {
+                    try { $sid = [string]$s.skillId } catch { $sid = $null }
+                }
+                if ($sid) { [void]$skillIds.Add($sid) }
+            }
+
+            $members.Add([pscustomobject]@{
+                    UserId   = $userId
+                    Name     = $userName
+                    SkillIds = @($skillIds)
+                }) | Out-Null
+        }
+
+        $pageCount = 0
+        try { $pageCount = [int]$resp.pageCount } catch { $pageCount = 0 }
+        if ($pageCount -le 0 -and $entities.Count -lt $pageSize) { break }
+        if ($pageCount -gt 0 -and $page -ge $pageCount) { break }
+        if ($entities.Count -lt $pageSize) { break }
+        $page++
+    }
+
+    return @($members)
+}
+
+function Get-ConversationRequiredRoutingSkillIds {
+    param(
+        [Parameter(Mandatory)]
+        $Conversation
+    )
+
+    $ids = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::OrdinalIgnoreCase)
+
+    $participants = @()
+    try { $participants = @($Conversation.participants) } catch { $participants = @() }
+    foreach ($p in $participants) {
+        if (-not $p) { continue }
+        $segments = @()
+        try { $segments = @($p.segments) } catch { $segments = @() }
+        foreach ($seg in $segments) {
+            if (-not $seg) { continue }
+            foreach ($propName in @('requestedRoutingSkillIds', 'routingSkillIds', 'requestedSkillIds')) {
+                if (-not ($seg.PSObject.Properties.Name -contains $propName)) { continue }
+                foreach ($v in @($seg.$propName)) {
+                    $text = [string]$v
+                    if ($text -match '^[0-9a-fA-F\\-]{36}$') { [void]$ids.Add($text) }
+                }
+            }
+        }
+    }
+
+    return @($ids)
+}
+
+function Get-QueueWaitingConversations {
+    param(
+        [Parameter(Mandatory)]
+        [string]$QueueId,
+
+        [Parameter(Mandatory)]
+        [string]$Interval
+    )
+
+    $token = Get-ExplorerAccessToken
+    if ([string]::IsNullOrWhiteSpace($token)) {
+        throw "Please provide an OAuth token first."
+    }
+
+    $body = @{
+        interval = $Interval
+        order    = 'asc'
+        orderBy  = 'conversationStart'
+        paging   = @{
+            pageSize   = 250
+            pageNumber = 1
+        }
+        conversationFilters = @(
+            @{
+                type       = 'or'
+                predicates = @(
+                    @{
+                        dimension = 'queueId'
+                        value     = $QueueId
+                    }
+                )
+            }
+        )
+        segmentFilters = @()
+    }
+
+    $resp = Invoke-GCRequest -Method 'POST' -BaseUri $ApiBaseUrl -AccessToken ($token.Trim()) -Path '/api/v2/analytics/conversations/details/query' -Body $body
+    $conversations = @()
+    try { $conversations = @($resp.conversations) } catch { $conversations = @() }
+
+    # Heuristic: "waiting" candidates are conversations with no end time in the response.
+    $waiting = @()
+    foreach ($c in $conversations) {
+        if (-not $c) { continue }
+        $end = $null
+        try { $end = $c.conversationEnd } catch { $end = $null }
+        if ($end) { continue }
+        $waiting += $c
+    }
+
+    return @($waiting)
+}
+
+function Get-QueueWaitCoverageReport {
+    param(
+        [Parameter(Mandatory)]
+        [string]$QueueId,
+
+        [Parameter(Mandatory)]
+        [string]$Interval
+    )
+
+    Ensure-OpsInsightsModuleLoaded
+    Ensure-OpsInsightsContext
+
+    $intervalNorm = Normalize-AnalyticsInterval -Interval $Interval
+
+    $members = @(Get-QueueMembersWithSkills -QueueId $QueueId)
+    $waitingConversations = @(Get-QueueWaitingConversations -QueueId $QueueId -Interval $intervalNorm)
+
+    # Collect all skill ids that appear on conversations and queue members (for name resolution).
+    $allSkillIds = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($m in $members) {
+        foreach ($sid in @($m.SkillIds)) { if ($sid) { [void]$allSkillIds.Add([string]$sid) } }
+    }
+    $convSkillMap = @{}
+    foreach ($c in $waitingConversations) {
+        $req = @(Get-ConversationRequiredRoutingSkillIds -Conversation $c)
+        $cid = $null
+        try { $cid = [string]$c.conversationId } catch { $cid = $null }
+        if ($cid) { $convSkillMap[$cid] = $req }
+        foreach ($sid in $req) { if ($sid) { [void]$allSkillIds.Add([string]$sid) } }
+    }
+
+    $skillNameMap = Get-RoutingSkillNameMap -SkillIds @($allSkillIds)
+
+    $rows = New-Object System.Collections.Generic.List[object]
+    foreach ($c in $waitingConversations) {
+        $cid = $null
+        try { $cid = [string]$c.conversationId } catch { $cid = $null }
+        if ([string]::IsNullOrWhiteSpace($cid)) { continue }
+
+        $waitingSince = $null
+        try { $waitingSince = [datetimeoffset]::Parse([string]$c.conversationStart).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') } catch { $waitingSince = '' }
+
+        $requiredIds = @()
+        if ($convSkillMap.ContainsKey($cid)) { $requiredIds = @($convSkillMap[$cid]) }
+
+        $requiredNames = @(
+            foreach ($sid in $requiredIds) {
+                if ($skillNameMap.ContainsKey($sid)) { $skillNameMap[$sid] } else { $sid }
+            }
+        )
+        $requiredText = if ($requiredNames.Count -gt 0) { ($requiredNames -join ', ') } else { '<none found>' }
+
+        $eligible = @()
+        foreach ($m in $members) {
+            if ($requiredIds.Count -eq 0) {
+                $eligible += $m.Name
+                continue
+            }
+            $hasAll = $true
+            foreach ($rid in $requiredIds) {
+                if (-not ($m.SkillIds -contains $rid)) { $hasAll = $false; break }
+            }
+            if ($hasAll) { $eligible += $m.Name }
+        }
+
+        $eligibleSummary = if ($eligible.Count -eq 0) { '0' } elseif ($eligible.Count -le 5) { "$($eligible.Count): $($eligible -join ', ')" } else { "$($eligible.Count): $($eligible[0..4] -join ', '), ..." }
+
+        $rows.Add([pscustomobject]@{
+                ConversationId        = $cid
+                WaitingSinceUtc       = $waitingSince
+                RequiredSkillIds      = $requiredIds
+                RequiredSkills        = $requiredText
+                EligibleAgentNames    = $eligible
+                EligibleAgentsSummary = $eligibleSummary
+            }) | Out-Null
+    }
+
+    return @($rows)
+}
+
 if ($runSelectedInsightPackButton) {
     $runSelectedInsightPackButton.Add_Click({
             try {
@@ -8068,6 +8450,47 @@ if ($compareSelectedInsightPackButton) {
                 $statusText.Text = "Insight pack comparison failed."
                 Add-LogEntry "Insight pack compare failed: $($_.Exception.Message)"
                 [System.Windows.MessageBox]::Show("Insight pack compare failed: $($_.Exception.Message)", "Insight Pack Error", "OK", "Error")
+            }
+        })
+}
+
+if ($runQueueWaitReportButton) {
+    $runQueueWaitReportButton.Add_Click({
+            try {
+                $qid = if ($queueWaitQueueIdInput) { [string]$queueWaitQueueIdInput.Text } else { '' }
+                $qid = $qid.Trim()
+                if ([string]::IsNullOrWhiteSpace($qid)) {
+                    [System.Windows.MessageBox]::Show("Queue ID is required.", "Queue Wait Coverage", "OK", "Warning") | Out-Null
+                    return
+                }
+
+                $intervalText = if ($queueWaitIntervalInput) { [string]$queueWaitIntervalInput.Text } else { '' }
+                $intervalText = $intervalText.Trim()
+                if ([string]::IsNullOrWhiteSpace($intervalText)) {
+                    $intervalText = Get-DefaultAnalyticsIntervalLastMinutes -Minutes 30
+                    if ($queueWaitIntervalInput) { $queueWaitIntervalInput.Text = $intervalText }
+                }
+
+                if ($queueWaitReportStatus) { $queueWaitReportStatus.Text = "Running queue wait coverage report..." }
+                $statusText.Text = "Running queue wait coverage report..."
+
+                $script:QueueWaitResults.Clear()
+                if ($queueWaitDetailsText) { $queueWaitDetailsText.Text = '' }
+
+                $rows = @(Get-QueueWaitCoverageReport -QueueId $qid -Interval $intervalText)
+                foreach ($r in $rows) { $script:QueueWaitResults.Add($r) | Out-Null }
+
+                $msg = "Queue wait coverage complete. Conversations=$($rows.Count)."
+                if ($queueWaitReportStatus) { $queueWaitReportStatus.Text = $msg }
+                $statusText.Text = $msg
+                Add-LogEntry $msg
+            }
+            catch {
+                $statusText.Text = "Queue wait coverage failed."
+                $err = $_.Exception.Message
+                if ($queueWaitReportStatus) { $queueWaitReportStatus.Text = "Failed: $err" }
+                Add-LogEntry "Queue wait coverage failed: $err"
+                [System.Windows.MessageBox]::Show("Queue wait coverage failed: $err", "Queue Wait Coverage", "OK", "Error") | Out-Null
             }
         })
 }
