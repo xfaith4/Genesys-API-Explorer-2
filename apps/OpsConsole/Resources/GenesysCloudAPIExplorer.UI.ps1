@@ -2171,6 +2171,23 @@ function Update-FilterList {
     }
 }
 
+function Refresh-FilterList {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('Conversation', 'Segment')]
+        [string]$Scope
+    )
+
+    try {
+        Update-FilterList -Scope $Scope
+        Update-FilterBuilderHint
+        Invoke-FilterBuilderBody
+    }
+    catch {
+        Add-LogEntry "Failed to refresh filter list ($Scope): $($_.Exception.Message)"
+    }
+}
+
 function Get-BodyTextBox {
     if ($script:CurrentBodyControl) {
         if ($script:CurrentBodyControl.ValueControl -and ($script:CurrentBodyControl.ValueControl -is [System.Windows.Controls.TextBox])) {
