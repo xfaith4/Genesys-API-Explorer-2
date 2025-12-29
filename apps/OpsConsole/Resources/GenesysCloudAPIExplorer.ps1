@@ -5009,7 +5009,8 @@ function Normalize-Templates {
         $norm = Normalize-TemplateObject -Template $t -DefaultLastModified $DefaultLastModified
         if ($norm) { $out.Add($norm) | Out-Null }
     }
-    return @($out)
+    # Avoid PowerShell host differences when expanding generic lists.
+    return $out.ToArray()
 }
 
 function Enable-GridViewColumnSorting {
