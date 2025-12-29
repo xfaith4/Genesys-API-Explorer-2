@@ -554,6 +554,6 @@ Phase 2 deferred features complete the advanced parameter input system started i
 
 ---
 
-*For overall project documentation, see PROJECT_PLAN.md*
+*For canonical planning, see `docs/ROADMAP.md`. For legacy phased planning, see `docs/PROJECT_PLAN.md`.*
 *For original Phase 2 features, see PHASE2_SUMMARY.md*
 *For usage instructions, see README.md*

@@ -193,9 +193,11 @@ Genesys-API-Explorer/
 │       ├── GenesysCloud.ConversationToolkit.psd1  # Module manifest
 │       └── GenesysCloud.ConversationToolkit.psm1  # Module implementation
 ├── docs/                                       # Documentation directory
+│   ├── ROADMAP.md                              # Canonical roadmap (milestones + definitions)
+│   ├── CAPABILITY_MAP.md                       # Pillars/ownership boundaries
 │   ├── CONVERSATION_TOOLKIT.md                 # Complete Conversation Toolkit reference
 │   ├── DEVELOPMENT_HISTORY.md                  # Complete development timeline and feature history
-│   ├── PROJECT_PLAN.md                         # 8-phase enhancement plan
+│   ├── PROJECT_PLAN.md                         # Historical 8-phase enhancement plan (legacy)
 │   ├── TEMPLATE_CATALOG.md                     # Complete reference of all 31 templates
 │   ├── PHASE1_SUMMARY.md                       # Phase 1 implementation details
 │   ├── PHASE2_SUMMARY.md                       # Phase 2 implementation details
@@ -467,6 +469,10 @@ The report is designed to provide actionable insights at a glance, with the most
 
 Comprehensive project documentation is available in the `docs/` directory:
 
+- **[ROADMAP.md](docs/ROADMAP.md)** - Canonical roadmap (milestones, sequencing, definitions)
+
+- **[CAPABILITY_MAP.md](docs/CAPABILITY_MAP.md)** - Product pillars and stable interfaces (contracts)
+
 - **[TEMPLATE_CATALOG.md](docs/TEMPLATE_CATALOG.md)** - Complete reference for all 31 templates
   - Organized by category (Conversations, Analytics, Speech Analytics, Telephony, Routing, Users)
   - Detailed description of each template
@@ -481,10 +487,7 @@ Comprehensive project documentation is available in the `docs/` directory:
   - Technical architecture and design decisions
   - Future roadmap and planned enhancements
 
-- **[PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** - 8-phase enhancement plan
-  - Structured roadmap for future development
-  - Feature priorities and dependencies
-  - Implementation guidelines
+- **[PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** - Historical phased plan (legacy)
 
 - **Phase Implementation Details:**
   - [PHASE1_SUMMARY.md](docs/PHASE1_SUMMARY.md) - Core UX enhancements (token validation, history, progress)

@@ -270,5 +270,5 @@ The implementation maintains backward compatibility with all existing features w
 
 ---
 
-*For detailed technical documentation, see PROJECT_PLAN.md*
+*For canonical planning, see `docs/ROADMAP.md`. For legacy phased planning, see `docs/PROJECT_PLAN.md`.*
 *For usage instructions, see README.md*

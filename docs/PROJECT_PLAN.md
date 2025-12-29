@@ -1,5 +1,8 @@
 # Genesys API Explorer - Enhancement Project Plan
 
+> Note: This document is a **historical execution plan/log** from the original enhancement track.
+> The canonical roadmap (milestones, sequencing, definitions) is `docs/ROADMAP.md`.
+
 ## Overview
 
 This document outlines a phased approach to implementing the enhancements identified in `Potential Enhancements.txt`. Each phase builds upon the previous one, ensuring a stable foundation while progressively adding more advanced features.

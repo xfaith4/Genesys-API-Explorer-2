@@ -500,5 +500,5 @@ These enhancements build upon the original Phase 2 work, completing the deferred
 
 ---
 
-*For detailed technical documentation, see PROJECT_PLAN.md*
+*For canonical planning, see `docs/ROADMAP.md`. For legacy phased planning, see `docs/PROJECT_PLAN.md`.*
 *For usage instructions, see README.md*

@@ -1,5 +1,8 @@
 # Genesys API Explorer → Ops Insights Console (Done Right Path)
 
+> Note: This document is an architectural “done right” narrative.
+> The canonical roadmap (milestones, sequencing, definitions) is `docs/ROADMAP.md`.
+
 This repo is being evolved from a Swagger-driven endpoint browser into an Ops-grade **Answers → Evidence → Drilldown → Action** workstation for Genesys Cloud.
 
 ## Non-negotiables

@@ -418,5 +418,5 @@ Phase 3 builds upon the solid foundations of Phases 1 and 2, adding powerful aut
 
 ---
 
-*For detailed technical documentation, see PROJECT_PLAN.md*
+*For canonical planning, see `docs/ROADMAP.md`. For legacy phased planning, see `docs/PROJECT_PLAN.md`.*
 *For usage instructions, see README.md*

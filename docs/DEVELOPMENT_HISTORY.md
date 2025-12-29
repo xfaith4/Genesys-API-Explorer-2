@@ -51,6 +51,8 @@ Genesys-API-Explorer/
 ├── README.md                         # User documentation
 ├── docs/                            # Documentation directory
 │   ├── DEVELOPMENT_HISTORY.md       # This file
+│   ├── ROADMAP.md                   # Canonical roadmap (milestones + definitions)
+│   ├── CAPABILITY_MAP.md            # Pillars/ownership boundaries
 │   ├── PHASE1_SUMMARY.md            # Phase 1 details
 │   ├── PHASE2_SUMMARY.md            # Phase 2 details
 │   ├── PHASE2_DEFERRED_SUMMARY.md   # Phase 2 extended features
@@ -930,4 +932,4 @@ The project maintains backward compatibility while introducing modern features t
 
 *For detailed phase information, see individual PHASE*_SUMMARY.md files in this directory.*  
 *For usage instructions, see README.md in the root directory.*  
-*For project planning, see PROJECT_PLAN.md in this directory.*
+*For project planning, see `docs/ROADMAP.md`. For historical planning artifacts, see `docs/PROJECT_PLAN.md`.*

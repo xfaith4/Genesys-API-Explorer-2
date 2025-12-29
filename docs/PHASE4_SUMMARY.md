@@ -383,7 +383,7 @@ For users who want the new templates:
 
 ### Files Updated
 1. **README.md**: Added Phase 4 section and updated template list
-2. **docs/PROJECT_PLAN.md**: Mark Phase 4 as complete (to be updated)
+2. **Planning docs**: Canonical roadmap is now `docs/ROADMAP.md` (legacy phased plan remains in `docs/PROJECT_PLAN.md`)
 3. **docs/PHASE4_SUMMARY.md**: This comprehensive documentation (NEW)
 4. **docs/DEVELOPMENT_HISTORY.md**: Add Phase 4 entry (to be updated)
 

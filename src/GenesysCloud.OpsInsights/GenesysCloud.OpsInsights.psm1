@@ -45,9 +45,11 @@ foreach ($file in (Get-ScriptFiles -Directory $privateDir)) { . $file.FullName }
 foreach ($file in (Get-ScriptFiles -Directory $publicDir)) { . $file.FullName }
 
 $publicFunctions = @(
+    'Add-GCInsightCorrelations',
     'Connect-GCCloud',
     'Disconnect-GCCloud',
     'Export-GCConversationToExcel',
+    'Export-GCInsightPackHtml',
     'Get-GCContext',
     'Get-GCConversationDetails',
     'Get-GCConversationTimeline',

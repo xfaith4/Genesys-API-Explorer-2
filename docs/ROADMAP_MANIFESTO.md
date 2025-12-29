@@ -1,5 +1,8 @@
 ## Roadmap Manifesto
 
+> Note: This document is **vision/principles** and is not the canonical delivery plan.
+> The canonical roadmap (milestones, sequencing, definitions) is `docs/ROADMAP.md`.
+
 Here’s the “done right” path if the goal is not “an API explorer,” but an Ops-grade Genesys Cloud intelligence workstation that lets an engineer answer hard questions fast and lets a director walk into a VP meeting with defensible, repeatable metrics.
 
 ### North Star: stop being an endpoint browser
@@ -141,14 +144,14 @@ Here’s a clean pathway that doesn’t collapse under ambition:
    - Data Action failure hotspot report
    - Flow health regression report (top flows by impact)
    - Export pipeline (Excel + HTML)
-3. **Phase 3: Correlation engine** (the “wow” factor)
+3. **Correlation engine** (the “wow” factor)
    - Correlate failures ↔ config changes ↔ release windows ↔ downstream availability
    - Evidence packets: one-click bundle for an incident
-4. **Phase 4: Director-grade reporting**
+4. **Director-grade reporting**
    - Weekly/monthly exec report pack:
      - “Reliability,” “Customer experience,” “Agent experience,” “Automation effectiveness,” “Cost pressure”
    - Narrative templates so the report reads like a tight briefing, not a data dump
-5. **Phase 5: Distribution and adoption**
+5. **Distribution and adoption**
    - MSIX / packaged EXE, auto-update channel internally
    - “Run scheduled reports” mode for managers
    - “Engineer mode” stays interactive

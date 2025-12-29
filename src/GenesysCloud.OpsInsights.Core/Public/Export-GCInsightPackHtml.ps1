@@ -154,6 +154,49 @@ th { background: #fafafa; }
 	            }
 	        }
 
+        # Correlations (optional)
+        try {
+            if ($Result.Evidence.PSObject.Properties.Name -contains 'Correlations' -and $Result.Evidence.Correlations) {
+                $changeAudit = $null
+                if ($Result.Evidence.Correlations.PSObject.Properties.Name -contains 'ChangeAudit') { $changeAudit = $Result.Evidence.Correlations.ChangeAudit }
+                if ($changeAudit -and $changeAudit.AuditChanges) {
+                    $audit = $changeAudit.AuditChanges
+                    $summary = if ($audit.PSObject.Properties.Name -contains 'Summary') { [string]$audit.Summary } else { '' }
+                    $total = if ($audit.PSObject.Properties.Name -contains 'Total') { [int]$audit.Total } else { 0 }
+                    $highCount = 0
+                    try { if ($audit.PSObject.Properties.Name -contains 'HighSignal') { $highCount = @($audit.HighSignal).Count } } catch {}
+
+                    [void]$html.AppendLine("<div style='margin-top:10px'><b>Correlations</b></div>")
+                    [void]$html.AppendLine("<div class='kv'>")
+                    [void]$html.AppendLine("<div><b>Change audit</b></div><div>$((Encode-Html $summary))</div>")
+                    [void]$html.AppendLine("<div><b>Total events</b></div><div>$((Encode-Html $total))</div>")
+                    [void]$html.AppendLine("<div><b>High-signal events</b></div><div>$((Encode-Html $highCount))</div>")
+                    [void]$html.AppendLine("</div>")
+
+                    $byType = @()
+                    try { if ($audit.PSObject.Properties.Name -contains 'ByEntityType') { $byType = @($audit.ByEntityType) } } catch {}
+                    if ($byType.Count -gt 0) {
+                        [void]$html.AppendLine("<table><thead><tr><th>EntityType</th><th>Count</th></tr></thead><tbody>")
+                        foreach ($row in ($byType | Select-Object -First 10)) {
+                            [void]$html.AppendLine("<tr><td>$((Encode-Html $row.EntityType))</td><td>$((Encode-Html $row.Count))</td></tr>")
+                        }
+                        [void]$html.AppendLine("</tbody></table>")
+                    }
+
+                    $sample = @()
+                    try { if ($audit.PSObject.Properties.Name -contains 'Sample') { $sample = @($audit.Sample) } } catch {}
+                    if ($sample.Count -gt 0) {
+                        [void]$html.AppendLine("<div style='margin-top:10px'><b>Audit sample</b></div>")
+                        [void]$html.AppendLine("<table><thead><tr><th>When</th><th>EntityType</th><th>Action</th><th>Status</th><th>Name</th><th>Service</th></tr></thead><tbody>")
+                        foreach ($row in ($sample | Select-Object -First 25)) {
+                            [void]$html.AppendLine("<tr><td>$((Encode-Html $row.EventDate))</td><td>$((Encode-Html $row.EntityType))</td><td>$((Encode-Html $row.Action))</td><td>$((Encode-Html $row.Status))</td><td>$((Encode-Html $row.EntityName))</td><td>$((Encode-Html $row.ServiceName))</td></tr>")
+                        }
+                        [void]$html.AppendLine("</tbody></table>")
+                    }
+                }
+            }
+        } catch {}
+
         if (-not [string]::IsNullOrWhiteSpace($notes)) {
             [void]$html.AppendLine("<div style='margin-top:6px'><b>Notes:</b> $((Encode-Html $notes))</div>")
         }
