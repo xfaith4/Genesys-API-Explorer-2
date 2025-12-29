@@ -5396,14 +5396,17 @@ $Xaml = @"
         MinHeight="600" MinWidth="800"
         WindowStartupLocation="CenterScreen">
   <DockPanel LastChildFill="True">
-    <Menu DockPanel.Dock="Top">
-      <MenuItem Header="_Settings">
-        <MenuItem Name="AppSettingsMenuItem" Header="App Settings..."/>
-        <Separator/>
-        <MenuItem Name="SettingsMenuItem" Header="Endpoints Configuration"/>
-        <Separator/>
-        <MenuItem Name="ResetEndpointsMenuItem" Header="Reset to Default"/>
-      </MenuItem>
+	    <Menu DockPanel.Dock="Top">
+	      <MenuItem Header="_Settings">
+	        <MenuItem Name="AppSettingsMenuItem" Header="App Settings..."/>
+	        <Separator/>
+	        <MenuItem Name="TraceMenuItem" Header="Enable Tracing" IsCheckable="True"
+	                  ToolTip="Write verbose diagnostics to a temp log file (can include local file paths)."/>
+	        <Separator/>
+	        <MenuItem Name="SettingsMenuItem" Header="Endpoints Configuration"/>
+	        <Separator/>
+	        <MenuItem Name="ResetEndpointsMenuItem" Header="Reset to Default"/>
+	      </MenuItem>
       <MenuItem Header="_Help">
         <MenuItem Name="HelpMenuItem" Header="Show Help"/>
         <Separator/>
@@ -5992,12 +5995,13 @@ $conversationReportText = $Window.FindName("ConversationReportText")
 $conversationReportStatus = $Window.FindName("ConversationReportStatus")
 $conversationReportProgressBar = $Window.FindName("ConversationReportProgressBar")
 $conversationReportProgressText = $Window.FindName("ConversationReportProgressText")
-$conversationReportEndpointLog = $Window.FindName("ConversationReportEndpointLog")
-$appSettingsMenuItem = $Window.FindName("AppSettingsMenuItem")
-$settingsMenuItem = $Window.FindName("SettingsMenuItem")
-$exportLogButton = $Window.FindName("ExportLogButton")
-$clearLogButton = $Window.FindName("ClearLogButton")
-$resetEndpointsMenuItem = $Window.FindName("ResetEndpointsMenuItem")
+	$conversationReportEndpointLog = $Window.FindName("ConversationReportEndpointLog")
+	$appSettingsMenuItem = $Window.FindName("AppSettingsMenuItem")
+	$traceMenuItem = $Window.FindName("TraceMenuItem")
+	$settingsMenuItem = $Window.FindName("SettingsMenuItem")
+	$exportLogButton = $Window.FindName("ExportLogButton")
+	$clearLogButton = $Window.FindName("ClearLogButton")
+	$resetEndpointsMenuItem = $Window.FindName("ResetEndpointsMenuItem")
 $requestHistoryList = $Window.FindName("RequestHistoryList")
 $replayRequestButton = $Window.FindName("ReplayRequestButton")
 $clearHistoryButton = $Window.FindName("ClearHistoryButton")
@@ -7166,6 +7170,35 @@ if ($appSettingsMenuItem) {
 
             Update-AuthUiState
             Add-LogEntry "App settings updated (region=$($script:Region), oauth=$($script:OAuthType))."
+        })
+}
+
+if ($traceMenuItem) {
+    try { $traceMenuItem.IsChecked = [bool]$script:TraceEnabled } catch { }
+    $traceMenuItem.Add_Click({
+            try {
+                $enabled = [bool]$traceMenuItem.IsChecked
+                if ($enabled) {
+                    $script:TraceEnabled = $true
+                    $env:GENESYS_API_EXPLORER_TRACE = '1'
+                    if ([string]::IsNullOrWhiteSpace($script:TraceLogPath)) {
+                        $script:TraceLogPath = Get-TraceLogPath
+                    }
+                    Write-TraceLog "Tracing enabled from Settings menu."
+                    Add-LogEntry "Tracing enabled. Log: $script:TraceLogPath"
+                    try { $traceMenuItem.ToolTip = "Tracing enabled. Log: $script:TraceLogPath" } catch { }
+                }
+                else {
+                    Write-TraceLog "Tracing disabled from Settings menu."
+                    $script:TraceEnabled = $false
+                    $env:GENESYS_API_EXPLORER_TRACE = '0'
+                    Add-LogEntry "Tracing disabled."
+                    try { $traceMenuItem.ToolTip = "Tracing disabled. Toggle to write a temp log file." } catch { }
+                }
+            }
+            catch {
+                Add-LogEntry "Failed to toggle tracing: $($_.Exception.Message)"
+            }
         })
 }
 
