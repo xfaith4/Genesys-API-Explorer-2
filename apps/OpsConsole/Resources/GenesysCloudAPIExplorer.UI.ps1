@@ -7828,9 +7828,23 @@ function Apply-InsightTimePresetToUi {
         [string]$PresetKey
     )
 
+    function Format-InsightUtcIso {
+        param([Parameter(Mandatory)]$Value)
+
+        try {
+            $dt = $Value
+            if ($dt -isnot [datetime]) { $dt = [datetime]$dt }
+            $utc = $dt.ToUniversalTime()
+            return $utc.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+        }
+        catch {
+            try { return [string]$Value } catch { return '' }
+        }
+    }
+
     $window = Resolve-InsightUtcWindowFromPreset -PresetKey $PresetKey
-    $startIso = $window.StartUtc.ToString('o')
-    $endIso = $window.EndUtc.ToString('o')
+    $startIso = Format-InsightUtcIso -Value $window.StartUtc
+    $endIso = Format-InsightUtcIso -Value $window.EndUtc
 
     if ($insightGlobalStartInput) { $insightGlobalStartInput.Text = $startIso }
     if ($insightGlobalEndInput) { $insightGlobalEndInput.Text = $endIso }
@@ -7930,6 +7944,24 @@ function Run-SelectedInsightPack {
     Ensure-OpsInsightsModuleLoaded
     Ensure-OpsInsightsContext
     $packParams = Get-InsightPackParameterValues
+
+    # Normalize common timestamp parameters to millisecond precision (Genesys endpoints often reject >3 fractional digits).
+    foreach ($k in @('startDate', 'endDate')) {
+        try {
+            if (-not $packParams.ContainsKey($k)) { continue }
+            $raw = $packParams[$k]
+            if ($null -eq $raw) { continue }
+            $text = [string]$raw
+            if ([string]::IsNullOrWhiteSpace($text)) { continue }
+
+            $dto = [datetimeoffset]::Parse($text, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal)
+            $packParams[$k] = $dto.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+            Write-TraceLog "Run-SelectedInsightPack: normalized $k='$text' -> '$($packParams[$k])'"
+        }
+        catch {
+            Write-TraceLog "Run-SelectedInsightPack: could not normalize $k='$($packParams[$k])' ($($_.Exception.Message))"
+        }
+    }
 
     $useCache = $false
     if ($useInsightCacheCheckbox) { $useCache = [bool]$useInsightCacheCheckbox.IsChecked }
