@@ -76,10 +76,12 @@ function Get-InsightPackCatalog {
     }
 
     $items = New-Object System.Collections.Generic.List[object]
+    $script:InsightPackCatalogErrors = New-Object System.Collections.Generic.List[string]
     foreach ($dir in $dirs) {
         Get-ChildItem -Path $dir -Filter '*.json' -File -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object {
+            $packPath = $_.FullName
             try {
-                $raw = Get-Content -LiteralPath $_.FullName -Raw
+                $raw = Get-Content -LiteralPath $packPath -Raw -Encoding utf8
                 $pack = $raw | ConvertFrom-Json
                 if (-not $pack -or -not $pack.id) { return }
 
@@ -129,6 +131,7 @@ function Get-InsightPackCatalog {
             }
             catch {
                 # ignore malformed packs; they should still be runnable by path if needed
+                try { $script:InsightPackCatalogErrors.Add("$packPath :: $($_.Exception.Message)") | Out-Null } catch { }
             }
         }
     }
@@ -677,12 +680,13 @@ function Show-AppSettingsDialog {
     $settingsXaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="App Settings" Height="360" Width="760"
+        Title="App Settings" Height="340" Width="760"
         MinHeight="340" MinWidth="640"
         ResizeMode="CanResizeWithGrip"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Grid Margin="20">
     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
@@ -704,7 +708,8 @@ function Show-AppSettingsDialog {
     <StackPanel Grid.Row="2" Margin="0 0 0 12">
       <TextBlock Text="OAuth Token" FontWeight="Bold" Margin="0 0 0 6"/>
       <TextBox Name="TokenText" Height="60" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-               ToolTip="Paste a Genesys Cloud OAuth access token (Bearer)."/>
+               ToolTip="Paste a Genesys Cloud OAuth access token (Bearer)."
+               ToolTipService.Placement="Top" ToolTipService.InitialShowDelay="450" ToolTipService.ShowDuration="12000"/>
       <TextBlock Text="Token is stored in memory only (not written to disk)." Foreground="Gray" FontSize="11" Margin="0 6 0 0"/>
     </StackPanel>
 
@@ -714,7 +719,7 @@ function Show-AppSettingsDialog {
       <Button Name="ClearTokenButton" Width="120" Height="28" Content="Clear Token"/>
     </StackPanel>
 
-    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 20 0 0">
+    <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 20 0 0">
       <Button Name="ApplyButton" Content="Apply" Width="100" Height="32" Margin="0 0 10 0"/>
       <Button Name="CancelButton" Content="Cancel" Width="100" Height="32"/>
     </StackPanel>
@@ -5105,9 +5110,11 @@ function Resolve-WorkspaceRoot {
             $item = Get-Item -LiteralPath $start -ErrorAction SilentlyContinue
             if (-not $item) { continue }
             $current = if ($item.PSIsContainer) { $item.FullName } else { Split-Path -Parent $item.FullName }
-            for ($i = 0; $i -lt 8; $i++) {
-                $packs = Join-Path -Path $current -ChildPath 'insights/packs'
+            for ($i = 0; $i -lt 10; $i++) {
+                $packs = Join-Path -Path (Join-Path -Path $current -ChildPath 'insights') -ChildPath 'packs'
+                $legacyPacks = Join-Path -Path $current -ChildPath 'insightpacks'
                 if (Test-Path -LiteralPath $packs) { return $current }
+                if (Test-Path -LiteralPath $legacyPacks) { return $current }
 
                 $parent = Split-Path -Parent $current
                 if (-not $parent -or ($parent -eq $current)) { break }
@@ -5135,9 +5142,9 @@ if (-not $workspaceRoot) {
     $workspaceRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ScriptRoot))
 }
 
-$insightPackRoot = Join-Path -Path $workspaceRoot -ChildPath 'insights/packs'
+$insightPackRoot = Join-Path -Path (Join-Path -Path $workspaceRoot -ChildPath 'insights') -ChildPath 'packs'
 $legacyInsightPackRoot = Join-Path -Path $workspaceRoot -ChildPath 'insightpacks'
-$insightBriefingRoot = Join-Path -Path $workspaceRoot -ChildPath 'insights/briefings'
+$insightBriefingRoot = Join-Path -Path (Join-Path -Path $workspaceRoot -ChildPath 'insights') -ChildPath 'briefings'
 $legacyInsightBriefingRoot = Join-Path -Path $workspaceRoot -ChildPath 'InsightBriefings'
 $script:OpsInsightsManifest = Join-Path -Path $workspaceRoot -ChildPath 'src/GenesysCloud.OpsInsights/GenesysCloud.OpsInsights.psd1'
 $script:OpsInsightsModuleRoot = Split-Path -Parent $script:OpsInsightsManifest
@@ -7543,6 +7550,22 @@ if ($insightPackCombo) {
     $script:InsightPackCatalog = @(Get-InsightPackCatalog -PackDirectory $insightPackRoot -LegacyPackDirectory $legacyInsightPackRoot)
     $insightPackCombo.ItemsSource = $script:InsightPackCatalog
     $insightPackCombo.DisplayMemberPath = 'Display'
+
+    if (-not $script:InsightPackCatalog -or $script:InsightPackCatalog.Count -eq 0) {
+        $packExists = Test-Path -LiteralPath $insightPackRoot
+        $legacyExists = Test-Path -LiteralPath $legacyInsightPackRoot
+
+        $msg = "No insight packs found. Checked:`n- $insightPackRoot (exists=$packExists)`n- $legacyInsightPackRoot (exists=$legacyExists)"
+        if ($insightPackDescriptionText) { $insightPackDescriptionText.Text = $msg }
+        Add-LogEntry $msg
+
+        if ($script:InsightPackCatalogErrors -and $script:InsightPackCatalogErrors.Count -gt 0) {
+            Add-LogEntry "Insight pack parse errors (first 3):"
+            foreach ($line in @($script:InsightPackCatalogErrors | Select-Object -First 3)) {
+                Add-LogEntry "  $line"
+            }
+        }
+    }
 
 	    $insightPackCombo.Add_SelectionChanged({
             $selected = $insightPackCombo.SelectedItem
