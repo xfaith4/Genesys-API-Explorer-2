@@ -40,4 +40,15 @@ function Start-GenesysCloudApiExplorer {
     Start-GCOpsConsole
 }
 
-Start-GenesysCloudApiExplorer
+try {
+    Start-GenesysCloudApiExplorer
+}
+catch {
+    $msg = "Genesys Cloud API Explorer failed to start:`n$($_.Exception.Message)"
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+        [System.Windows.Forms.MessageBox]::Show($msg, "Startup Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+    }
+    catch { }
+    throw
+}
