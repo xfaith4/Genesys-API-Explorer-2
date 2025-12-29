@@ -177,7 +177,7 @@ Export-GCConversationToExcel `
 
 ```plaintext
 Genesys-API-Explorer/
-├── GenesysCloudAPIExplorer.ps1                 # Entry stub that loads the OpsConsole module
+├── GenesysCloudAPIExplorer.ps1                 # Single entrypoint (imports bundled module manifests + launches UI)
 ├── apps/
 │   └── OpsConsole/
 │       ├── OpsConsole.psd1                      # Module manifest defining Start-GCOpsConsole
@@ -215,7 +215,7 @@ Genesys-API-Explorer/
 
 ## Usage
 
-1. Run the script using Windows PowerShell (the stub now loads `apps/OpsConsole/OpsConsole.psd1` and calls `Start-GCOpsConsole`):
+1. Run the script using Windows PowerShell (single entrypoint; it loads the bundled module manifests under `src/` and `apps/` and launches the UI):
 
    ```powershell
    .\GenesysCloudAPIExplorer.ps1

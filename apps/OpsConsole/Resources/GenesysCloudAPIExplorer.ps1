@@ -5303,6 +5303,17 @@ function Ensure-OpsInsightsModuleLoaded {
     }
 }
 
+# Fail fast with a clear message when the UI is launched without the bundled modules available.
+try {
+    Ensure-OpsInsightsModuleLoaded
+}
+catch {
+    $msg = "Failed to load required OpsInsights modules: $($_.Exception.Message)`n`nLaunch this app using the repo entrypoint script:`n  .\\GenesysCloudAPIExplorer.ps1"
+    try { Write-TraceLog $msg } catch { }
+    try { [System.Windows.MessageBox]::Show($msg, "Startup Error", "OK", "Error") | Out-Null } catch { }
+    throw
+}
+
 function Ensure-OpsInsightsContext {
     $token = Get-ExplorerAccessToken
     if ([string]::IsNullOrWhiteSpace($token)) {
