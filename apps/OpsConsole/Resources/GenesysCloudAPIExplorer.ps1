@@ -1274,7 +1274,14 @@ function Export-PowerShellScript {
         [string]$Path,
         [hashtable]$Parameters,
         [string]$Token,
-        [string]$Region = "mypurecloud.com"
+        [string]$Region = "mypurecloud.com",
+
+        # Auto = prefer Invoke-GCRequest when available (fallback to Invoke-WebRequest)
+        # Portable = always use Invoke-WebRequest
+        # OpsInsights = require Invoke-GCRequest (module transport)
+        [Parameter()]
+        [ValidateSet('Auto','Portable','OpsInsights')]
+        [string]$Mode = 'Auto'
     )
 
     $script = @"
@@ -1341,31 +1348,105 @@ function Export-PowerShellScript {
 
     $script += "`r`n"
 
-    # Build the Invoke-WebRequest command
+    # Build request command (export mode)
     if ($bodyContent) {
         $script += "`$body = @'`r`n"
         $script += $bodyContent
         $script += "`r`n'@`r`n`r`n"
-        $script += @"
-try {
-    `$response = Invoke-WebRequest -Uri `$url -Method $Method -Headers `$headers -Body `$body -ContentType "application/json"
-    Write-Host "Success: `$(`$response.StatusCode)"
-    `$response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
-} catch {
-    Write-Error "Request failed: `$(`$_.Exception.Message)"
-}
+        if ($Mode -eq 'Portable') {
+            $script += @"
+	try {
+	    `$iwr = @{ Uri = `$url; Method = "$Method"; Headers = `$headers; Body = `$body; ContentType = "application/json"; ErrorAction = "Stop" }
+	    if (`$PSVersionTable.PSVersion.Major -lt 6) { `$iwr.UseBasicParsing = `$true }
+	    `$response = Invoke-WebRequest @iwr
+	    Write-Host "Success: `$(`$response.StatusCode)"
+	    `$response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
+	} catch {
+	    Write-Error "Request failed: `$(`$_.Exception.Message)"
+	}
 "@
+        }
+        elseif ($Mode -eq 'OpsInsights') {
+            $script += @"
+	try {
+	    Import-Module GenesysCloud.OpsInsights -ErrorAction Stop | Out-Null
+	    `$response = Invoke-GCRequest -Method $Method -Uri `$url -Headers `$headers -Body `$body -AsResponse
+	    Write-Host "Success: `$(`$response.StatusCode)"
+	    `$response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
+	} catch {
+	    Write-Error "Request failed: `$(`$_.Exception.Message)"
+	}
+"@
+        }
+        else {
+            $script += @"
+	try {
+	    try { Import-Module GenesysCloud.OpsInsights -ErrorAction SilentlyContinue | Out-Null } catch { }
+
+	    if (Get-Command Invoke-GCRequest -ErrorAction SilentlyContinue) {
+	        `$response = Invoke-GCRequest -Method $Method -Uri `$url -Headers `$headers -Body `$body -AsResponse
+	    }
+	    else {
+	        `$iwr = @{ Uri = `$url; Method = "$Method"; Headers = `$headers; Body = `$body; ContentType = "application/json"; ErrorAction = "Stop" }
+	        if (`$PSVersionTable.PSVersion.Major -lt 6) { `$iwr.UseBasicParsing = `$true }
+	        `$response = Invoke-WebRequest @iwr
+	    }
+
+	    Write-Host "Success: `$(`$response.StatusCode)"
+	    `$response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
+	} catch {
+	    Write-Error "Request failed: `$(`$_.Exception.Message)"
+	}
+"@
+        }
     }
     else {
-        $script += @"
-try {
-    `$response = Invoke-WebRequest -Uri `$url -Method $Method -Headers `$headers
-    Write-Host "Success: `$(`$response.StatusCode)"
-    `$response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
-} catch {
-    Write-Error "Request failed: `$(`$_.Exception.Message)"
-}
+        if ($Mode -eq 'Portable') {
+            $script += @"
+	try {
+	    `$iwr = @{ Uri = `$url; Method = "$Method"; Headers = `$headers; ErrorAction = "Stop" }
+	    if (`$PSVersionTable.PSVersion.Major -lt 6) { `$iwr.UseBasicParsing = `$true }
+	    `$response = Invoke-WebRequest @iwr
+	    Write-Host "Success: `$(`$response.StatusCode)"
+	    `$response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
+	} catch {
+	    Write-Error "Request failed: `$(`$_.Exception.Message)"
+	}
 "@
+        }
+        elseif ($Mode -eq 'OpsInsights') {
+            $script += @"
+	try {
+	    Import-Module GenesysCloud.OpsInsights -ErrorAction Stop | Out-Null
+	    `$response = Invoke-GCRequest -Method $Method -Uri `$url -Headers `$headers -AsResponse
+	    Write-Host "Success: `$(`$response.StatusCode)"
+	    `$response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
+	} catch {
+	    Write-Error "Request failed: `$(`$_.Exception.Message)"
+	}
+"@
+        }
+        else {
+            $script += @"
+	try {
+	    try { Import-Module GenesysCloud.OpsInsights -ErrorAction SilentlyContinue | Out-Null } catch { }
+
+	    if (Get-Command Invoke-GCRequest -ErrorAction SilentlyContinue) {
+	        `$response = Invoke-GCRequest -Method $Method -Uri `$url -Headers `$headers -AsResponse
+	    }
+	    else {
+	        `$iwr = @{ Uri = `$url; Method = "$Method"; Headers = `$headers; ErrorAction = "Stop" }
+	        if (`$PSVersionTable.PSVersion.Major -lt 6) { `$iwr.UseBasicParsing = `$true }
+	        `$response = Invoke-WebRequest @iwr
+	    }
+
+	    Write-Host "Success: `$(`$response.StatusCode)"
+	    `$response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
+	} catch {
+	    Write-Error "Request failed: `$(`$_.Exception.Message)"
+	}
+"@
+        }
     }
 
     return $script
@@ -2463,23 +2544,10 @@ function Get-PaginatedResults {
             & $ProgressCallback -PageNumber $pageNumber -Status "Fetching page $pageNumber..."
         }
 
-        try {
-            $url = if ($currentPath -match '^https?://') { $currentPath } else { "$BaseUrl$currentPath" }
-
-            $invokeParams = @{
-                Uri         = $url
-                Method      = $Method
-                Headers     = $Headers
-                ErrorAction = 'Stop'
-            }
-
-            if ($Body -and $Method -eq "POST") {
-                $invokeParams['Body'] = $Body
-                $invokeParams['ContentType'] = 'application/json'
-            }
-
-            $response = Invoke-WebRequest @invokeParams
-            $data = $response.Content | ConvertFrom-Json
+	        try {
+	            $url = if ($currentPath -match '^https?://') { $currentPath } else { "$BaseUrl$currentPath" }
+	            $response = Invoke-GCRequest -Method $Method -Uri $url -Headers $Headers -Body $Body -AsResponse
+	            $data = $response.Content | ConvertFrom-Json
 
             # Add results from this page
             if ($data.entities) {
@@ -2631,10 +2699,10 @@ function Get-ConversationReport {
             Message   = ""
         }
 
-        try {
-            $response = Invoke-WebRequest -Uri $url -Method Get -Headers $Headers -ErrorAction Stop
-            $data = $response.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
-            $result.($endpoint.PropertyName) = $data
+	        try {
+	            $response = Invoke-GCRequest -Method GET -Uri $url -Headers $Headers -AsResponse
+	            $data = $response.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
+	            $result.($endpoint.PropertyName) = $data
 
             $logEntry.Status = "Success"
             $logEntry.Message = "Retrieved successfully"
@@ -4458,12 +4526,12 @@ function Get-JobStatus {
         return
     }
 
-    $statusUrl = "$ApiBaseUrl$($JobTracker.Path)/$($JobTracker.JobId)"
-    try {
-        $statusResponse = Invoke-WebRequest -Uri $statusUrl -Method Get -Headers $JobTracker.Headers -ErrorAction Stop
-        $statusJson = $statusResponse.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
-        $statusValue = if ($statusJson.status) { $statusJson.status } elseif ($statusJson.state) { $statusJson.state } else { $null }
-        $JobTracker.Status = $statusValue
+	$statusUrl = "$ApiBaseUrl$($JobTracker.Path)/$($JobTracker.JobId)"
+	try {
+	    $statusResponse = Invoke-GCRequest -Method GET -Uri $statusUrl -Headers $JobTracker.Headers -AsResponse
+	    $statusJson = $statusResponse.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
+	    $statusValue = if ($statusJson.status) { $statusJson.status } elseif ($statusJson.state) { $statusJson.state } else { $null }
+	    $JobTracker.Status = $statusValue
         $JobTracker.LastUpdate = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
         Update-JobPanel -Status $statusValue -Updated $JobTracker.LastUpdate
         Add-LogEntry "Job $($JobTracker.JobId) status checked: $statusValue"
@@ -4991,14 +5059,20 @@ $Xaml = @"
       </Grid>
     </Border>
 
-	    <StackPanel Grid.Row="6" Name="ActionButtonsPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0 0 0 10">
-      <Button Name="SubmitButton" Width="150" Height="34" Content="Submit API Call" Margin="0 0 10 0"/>
-      <Button Name="SaveButton" Width="150" Height="34" Content="Save Response" IsEnabled="False" Margin="0 0 10 0"/>
-      <Button Name="ExportPowerShellButton" Width="150" Height="34" Content="Export PowerShell" Margin="0 0 10 0" ToolTip="Generate PowerShell script for this request"/>
-      <Button Name="ExportCurlButton" Width="120" Height="34" Content="Export cURL" ToolTip="Generate cURL command for this request"/>
-      <TextBlock Name="ProgressIndicator" VerticalAlignment="Center" Foreground="Blue" Margin="10 0 5 0" Visibility="Collapsed">⏳</TextBlock>
-      <TextBlock Name="StatusText" VerticalAlignment="Center" Foreground="SlateGray" Margin="5 0 0 0"/>
-    </StackPanel>
+		    <StackPanel Grid.Row="6" Name="ActionButtonsPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0 0 0 10">
+	      <Button Name="SubmitButton" Width="150" Height="34" Content="Submit API Call" Margin="0 0 10 0"/>
+	      <Button Name="SaveButton" Width="150" Height="34" Content="Save Response" IsEnabled="False" Margin="0 0 10 0"/>
+	      <Button Name="ExportPowerShellButton" Width="150" Height="34" Content="Export PowerShell" Margin="0 0 10 0" ToolTip="Generate PowerShell script for this request"/>
+	      <ComboBox Name="PowerShellExportModeCombo" Width="240" Height="34" Margin="0 0 10 0" SelectedIndex="0"
+	                ToolTip="Choose export style. Portable uses Invoke-WebRequest only. OpsInsights-native requires the module and uses Invoke-GCRequest. Auto prefers OpsInsights when available.">
+	        <ComboBoxItem Content="Auto (prefer OpsInsights)"/>
+	        <ComboBoxItem Content="Portable (Invoke-WebRequest)"/>
+	        <ComboBoxItem Content="OpsInsights-native (Invoke-GCRequest)"/>
+	      </ComboBox>
+	      <Button Name="ExportCurlButton" Width="120" Height="34" Content="Export cURL" ToolTip="Generate cURL command for this request"/>
+	      <TextBlock Name="ProgressIndicator" VerticalAlignment="Center" Foreground="Blue" Margin="10 0 5 0" Visibility="Collapsed">⏳</TextBlock>
+	      <TextBlock Name="StatusText" VerticalAlignment="Center" Foreground="SlateGray" Margin="5 0 0 0"/>
+	    </StackPanel>
 
 	    <TabControl Grid.Row="7" Name="MainTabControl" VerticalAlignment="Stretch">
       <TabItem Header="Response">
@@ -5416,11 +5490,12 @@ $insightBriefingPathText = $Window.FindName("InsightBriefingPathText")
 $insightBriefingsList = $Window.FindName("InsightBriefingsList")
 $refreshInsightBriefingsButton = $Window.FindName("RefreshInsightBriefingsButton")
 $openBriefingsFolderButton = $Window.FindName("OpenBriefingsFolderButton")
-$openBriefingHtmlButton = $Window.FindName("OpenBriefingHtmlButton")
-$openBriefingSnapshotButton = $Window.FindName("OpenBriefingSnapshotButton")
-$exportPowerShellButton = $Window.FindName("ExportPowerShellButton")
-$exportCurlButton = $Window.FindName("ExportCurlButton")
-$templatesList = $Window.FindName("TemplatesList")
+	$openBriefingHtmlButton = $Window.FindName("OpenBriefingHtmlButton")
+	$openBriefingSnapshotButton = $Window.FindName("OpenBriefingSnapshotButton")
+	$exportPowerShellButton = $Window.FindName("ExportPowerShellButton")
+	$powerShellExportModeCombo = $Window.FindName("PowerShellExportModeCombo")
+	$exportCurlButton = $Window.FindName("ExportCurlButton")
+	$templatesList = $Window.FindName("TemplatesList")
 $saveTemplateButton = $Window.FindName("SaveTemplateButton")
 $loadTemplateButton = $Window.FindName("LoadTemplateButton")
 $deleteTemplateButton = $Window.FindName("DeleteTemplateButton")
@@ -6587,10 +6662,10 @@ if ($testTokenButton) {
                 }
                 $testUrl = "https://api.usw2.pure.cloud/api/v2/users/me"
 
-                $response = Invoke-WebRequest -Uri $testUrl -Method GET -Headers $headers -ErrorAction Stop
+	                $response = Invoke-GCRequest -Method GET -Uri $testUrl -Headers $headers -AsResponse
 
-                if ($response.StatusCode -eq 200) {
-                    $tokenStatusText.Text = "✓ Valid"
+	                if ($response.StatusCode -eq 200) {
+	                    $tokenStatusText.Text = "✓ Valid"
                     $tokenStatusText.Foreground = "Green"
                     Add-LogEntry "Token test successful: Token is valid."
                 }
@@ -7334,8 +7409,8 @@ if ($exportInsightBriefingButton) {
 }
 
 # Export PowerShell Script button
-if ($exportPowerShellButton) {
-    $exportPowerShellButton.Add_Click({
+	if ($exportPowerShellButton) {
+	    $exportPowerShellButton.Add_Click({
             $selectedPath = $pathCombo.SelectedItem
             $selectedMethod = $methodCombo.SelectedItem
             $token = $tokenBox.Text
@@ -7361,8 +7436,19 @@ if ($exportPowerShellButton) {
                 }
             }
 
-            # Generate PowerShell script
-            $script = Export-PowerShellScript -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token
+	            $mode = 'Auto'
+	            try {
+	                if ($powerShellExportModeCombo -and $powerShellExportModeCombo.SelectedIndex -ge 0) {
+	                    switch ([int]$powerShellExportModeCombo.SelectedIndex) {
+	                        1 { $mode = 'Portable' }
+	                        2 { $mode = 'OpsInsights' }
+	                        default { $mode = 'Auto' }
+	                    }
+	                }
+	            } catch { $mode = 'Auto' }
+
+	            # Generate PowerShell script
+	            $script = Export-PowerShellScript -Method $selectedMethod -Path $selectedPath -Parameters $requestParams -Token $token -Mode $mode
 
             # Show in dialog with copy/save options
             $dialog = New-Object Microsoft.Win32.SaveFileDialog
@@ -7827,12 +7913,12 @@ $btnSubmit.Add_Click({
             }
         }
 
-        try {
-            $response = Invoke-WebRequest -Uri $fullUrl -Method $selectedMethod.ToUpper() -Headers $headers -Body $body -ErrorAction Stop
-            $rawContent = $response.Content
-            $formattedContent = $rawContent
-            try {
-                $json = $rawContent | ConvertFrom-Json -ErrorAction Stop
+	        try {
+	            $response = Invoke-GCRequest -Method $selectedMethod.ToUpper() -Uri $fullUrl -Headers $headers -Body $body -AsResponse
+	            $rawContent = $response.Content
+	            $formattedContent = $rawContent
+	            try {
+	                $json = $rawContent | ConvertFrom-Json -ErrorAction Stop
                 $formattedContent = $json | ConvertTo-Json -Depth 10
             }
             catch {

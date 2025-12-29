@@ -9,11 +9,13 @@ This toolkit is a central feature of the Genesys-API-Explorer project, providing
 ## Key Features
 
 ### 1. Multi-Source Data Aggregation
+
 - Combines data from 6 different Genesys Cloud API endpoints
 - Correlates all data via ConversationId
 - Creates unified timeline views with chronological ordering
 
 ### 2. Professional Excel Export
+
 - Elegant formatting with TableStyle Light11
 - AutoFilter and AutoSize for optimal presentation
 - Multiple worksheets for different data perspectives
@@ -21,6 +23,7 @@ This toolkit is a central feature of the Genesys-API-Explorer project, providing
 - WebRTC error tracking and reporting
 
 ### 3. Conversation Analysis
+
 - Timeline-based event visualization
 - Participant tracking across all segments
 - Queue routing analysis
@@ -28,6 +31,7 @@ This toolkit is a central feature of the Genesys-API-Explorer project, providing
 - Sentiment and speech analytics integration
 
 ### 4. Performance Monitoring
+
 - Queue smoke reports with abandon/error rates
 - Agent performance metrics
 - Hot conversation detection (suspicious/problematic calls)
@@ -45,7 +49,7 @@ This toolkit is a central feature of the Genesys-API-Explorer project, providing
 Install-Module ImportExcel -Scope CurrentUser -Force
 ```
 
-3. **Genesys Cloud OAuth Token** with appropriate permissions:
+1. **Genesys Cloud OAuth Token** with appropriate permissions:
    - `conversations:readonly`
    - `analytics:readonly`
    - `speechandtextanalytics:readonly`
@@ -77,6 +81,7 @@ The module exports 6 main functions:
 Pulls comprehensive conversation data from multiple Genesys Cloud APIs and normalizes it into a unified timeline.
 
 #### API Endpoints Called
+
 - `GET /api/v2/conversations/{conversationId}` - Core conversation details
 - `GET /api/v2/analytics/conversations/{conversationId}/details` - Analytics data with MediaEndpointStats
 - `GET /api/v2/speechandtextanalytics/conversations/{conversationId}` - Speech analytics
@@ -88,13 +93,14 @@ Pulls comprehensive conversation data from multiple Genesys Cloud APIs and norma
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| BaseUri | string | Yes | Base API URI (e.g., https://api.usw2.pure.cloud) |
+| BaseUri | string | Yes | Base API URI (e.g., <https://api.usw2.pure.cloud>) |
 | AccessToken | string | Yes | OAuth Bearer token |
 | ConversationId | string | Yes | Target conversation ID |
 
 #### Output Structure
 
 Returns a PSCustomObject with:
+
 - **ConversationId** - The conversation identifier
 - **Core** - Raw core conversation data
 - **AnalyticsDetails** - Raw analytics details with MediaEndpointStats
@@ -107,6 +113,7 @@ Returns a PSCustomObject with:
 #### TimelineEvents Structure
 
 Each timeline event includes:
+
 - **ConversationId** - Ties all events together
 - **StartTime** - Event start timestamp (DateTime)
 - **EndTime** - Event end timestamp (DateTime, nullable)
@@ -138,7 +145,7 @@ $timeline.TimelineEvents | Format-Table StartTime, Source, EventType, Participan
 $timeline.AnalyticsDetails | ConvertTo-Json -Depth 10
 
 # Check for WebRTC errors
-$webRtcErrors = $timeline.TimelineEvents | 
+$webRtcErrors = $timeline.TimelineEvents |
     Where-Object { $_.Extra.ErrorCode -match 'webrtc|media|rtp' }
 $webRtcErrors | Format-Table StartTime, EventType, Participant, @{L='ErrorCode';E={$_.Extra.ErrorCode}}
 ```
@@ -148,6 +155,7 @@ $webRtcErrors | Format-Table StartTime, EventType, Participant, @{L='ErrorCode';
 Exports conversation timeline data to a professionally formatted Excel workbook with multiple worksheets.
 
 #### Features
+
 - **TableStyle Light11** - Elegant, professional table formatting
 - **AutoFilter** - Enable filtering on all columns
 - **AutoSize** - Automatically adjust column widths
@@ -166,9 +174,11 @@ Exports conversation timeline data to a professionally formatted Excel workbook 
 #### Worksheets Generated
 
 **Always Included:**
+
 - **Timeline Events** - Flattened timeline with all events chronologically sorted
 
 **Included with -IncludeRawData:**
+
 - **Core Conversation** - Core API participant and segment data
 - **Analytics Details** - Analytics segments with error codes
 - **Media Stats** - MediaEndpointStats for quality analysis (MOS scores, packet loss, jitter)
@@ -199,9 +209,11 @@ Get-GCConversationTimeline -BaseUri $baseUri -AccessToken $token -ConversationId
 Generates a "smoke detector" report for queue and agent performance using conversation aggregate metrics.
 
 #### API Endpoint Called
+
 - `POST /api/v2/analytics/conversations/aggregates/query` - Called twice (queue grouping, agent grouping)
 
 #### Metrics Analyzed
+
 - **nOffered** - Conversations offered
 - **nAnswered** - Conversations answered
 - **nAbandoned** - Conversations abandoned
@@ -211,6 +223,7 @@ Generates a "smoke detector" report for queue and agent performance using conver
 - **tWait** - Total wait time
 
 #### Calculated Indicators
+
 - **AbandonRate** - (nAbandoned / nOffered) × 100
 - **ErrorRate** - (nError / nOffered) × 100
 - **AvgHandle** - Average handle time in seconds
@@ -231,6 +244,7 @@ Generates a "smoke detector" report for queue and agent performance using conver
 #### Output Structure
 
 Returns a PSCustomObject with:
+
 - **Interval** - The query interval
 - **QueueSummary** - All queue statistics
 - **QueueTop** - Top N queues by abandon/error rate
@@ -260,6 +274,7 @@ $report.QueueTop | Export-Excel -Path "QueueReport.xlsx" -TableStyle Light11 -Au
 Identifies the "hottest" (most problematic) conversations for a specific queue.
 
 #### Detection Criteria (Smoke Score)
+
 - **Error Disconnects** - Weighted × 3 (non-client, non-endpoint disconnects)
 - **Short Calls** - Weighted × 2 (inbound interactions < 15 seconds)
 - **Queue Segments** - Weighted × 1 (multiple queue hops)
@@ -299,6 +314,7 @@ Export-GCConversationToExcel -ConversationData $timeline -IncludeRawData
 Launches a WPF-based interactive timeline viewer for conversations.
 
 #### Features
+
 - Input field for conversation ID
 - Load button to fetch timeline data
 - DataGrid with sortable columns
@@ -332,6 +348,7 @@ Show-GCConversationTimelineUI `
 End-to-end investigation workflow combining queue analysis, hot conversation detection, and timeline visualization.
 
 #### Workflow
+
 1. Generate queue smoke report
 2. Present queue selector (Out-GridView)
 3. Find hot conversations for selected queue
@@ -403,7 +420,7 @@ $report = Get-GCQueueSmokeReport `
     -TopN 20
 
 # Export problematic queues
-$report.QueueTop | 
+$report.QueueTop |
     Where-Object { $_.AbandonRate -gt 10 -or $_.ErrorRate -gt 5 } |
     Export-Excel -Path "ProblematicQueues.xlsx" -TableStyle Light11 -AutoFilter -AutoSize
 
@@ -415,7 +432,7 @@ foreach ($queue in $report.QueueTop | Select-Object -First 5) {
         -QueueId $queue.QueueId `
         -Interval $interval `
         -TopN 10
-    
+
     Write-Host "Queue $($queue.QueueId): $($hotConvs.Count) hot conversations found"
 }
 ```
@@ -433,20 +450,44 @@ $webRtcErrors = $timeline.TimelineEvents | Where-Object {
 }
 
 # Analyze error patterns
-$errorSummary = $webRtcErrors | 
-    Group-Object { $_.Extra.ErrorCode } | 
-    Select-Object Count, Name | 
+$errorSummary = $webRtcErrors |
+    Group-Object { $_.Extra.ErrorCode } |
+    Select-Object Count, Name |
     Sort-Object Count -Descending
 
 $errorSummary | Format-Table -AutoSize
 
 # Export detailed report
-$webRtcErrors | 
-    Select-Object StartTime, EventType, Participant, Direction, DisconnectType, 
+$webRtcErrors |
+    Select-Object StartTime, EventType, Participant, Direction, DisconnectType,
                   @{L='ErrorCode';E={$_.Extra.ErrorCode}},
                   @{L='MediaType';E={$_.Extra.MediaType}} |
-    Export-Excel -Path "WebRTC_Errors_$convId.xlsx" -TableStyle Light11 -AutoFilter -AutoSize
+Export-Excel -Path "WebRTC_Errors_$convId.xlsx" -TableStyle Light11 -AutoFilter -AutoSize
 ```
+
+### Workflow 6: WebRTC Disconnects (Bulk) + Excel Summary
+
+If you need **all conversations** in a time window that show **WebRTC disconnect indicators**, use the Ops Insights Insight Pack:
+
+```powershell
+Import-Module src/GenesysCloud.OpsInsights/GenesysCloud.OpsInsights.psd1 -Force
+Connect-GCCloud -RegionDomain 'usw2.pure.cloud' -AccessToken $token | Out-Null
+
+$result = Invoke-GCInsightPack -PackPath 'gc.webrtc.disconnects.v1.json' -Parameters @{
+  startDate = '2025-12-01T00:00:00Z'
+  endDate   = '2025-12-08T00:00:00Z'
+  # Optional: tune to your environment’s errorCode taxonomy
+  # errorCodeRegex = 'webrtc|ice|stun|turn|rtp|media'
+}
+
+# Exports Metrics + Steps + per-metric worksheets (when ImportExcel is installed)
+Export-GCInsightBriefing -Result $result -Directory (Join-Path $PWD 'briefings') -Force
+```
+
+The resulting Excel briefing includes:
+- A conversation list (conversationId + queue/division IDs + disconnect/error info)
+- A summary table grouped by queue
+- A summary table grouped by division
 
 ### Workflow 4: MediaEndpointStats Quality Analysis
 
@@ -468,7 +509,7 @@ if ($timeline.AnalyticsDetails.participants) {
                 $mosMetrics = $session.metrics | Where-Object { $_.name -match 'mos|quality' }
                 $packetLoss = $session.metrics | Where-Object { $_.name -match 'packet.*loss' }
                 $jitter = $session.metrics | Where-Object { $_.name -match 'jitter' }
-                
+
                 Write-Host "Participant: $($participant.participantId)"
                 Write-Host "  MOS Scores: $($mosMetrics.value -join ', ')"
                 Write-Host "  Packet Loss: $($packetLoss.value -join ', ')"
@@ -493,17 +534,17 @@ Write-Host "Conversation routed through $($uniqueQueues.Count) queue(s):"
 $uniqueQueues | ForEach-Object { Write-Host "  - $_" }
 
 # Find transfers
-$transfers = $timeline.TimelineEvents | Where-Object { 
-    $_.Extra.TransferType -or 
-    $_.EventType -eq 'transfer' 
+$transfers = $timeline.TimelineEvents | Where-Object {
+    $_.Extra.TransferType -or
+    $_.EventType -eq 'transfer'
 }
 
 Write-Host "`nTransfers detected: $($transfers.Count)"
 $transfers | Format-Table StartTime, EventType, Participant, Queue, @{L='TransferType';E={$_.Extra.TransferType}} -AutoSize
 
 # Identify routing delays
-$queueWaitEvents = $timeline.TimelineEvents | Where-Object { 
-    $_.EventType -eq 'alert' -or $_.EventType -eq 'dialing' 
+$queueWaitEvents = $timeline.TimelineEvents | Where-Object {
+    $_.EventType -eq 'alert' -or $_.EventType -eq 'dialing'
 }
 
 foreach ($wait in $queueWaitEvents) {
@@ -517,11 +558,13 @@ foreach ($wait in $queueWaitEvents) {
 ## Best Practices
 
 ### 1. Token Management
+
 - Use short-lived OAuth tokens
 - Never commit tokens to source control
 - Refresh tokens before long-running operations
 
 ### 2. Error Handling
+
 ```powershell
 try {
     $timeline = Get-GCConversationTimeline -BaseUri $baseUri -AccessToken $token -ConversationId $convId
@@ -532,6 +575,7 @@ try {
 ```
 
 ### 3. Bulk Operations
+
 ```powershell
 # Process multiple conversations
 $conversationIds = @('conv1', 'conv2', 'conv3')
@@ -539,12 +583,12 @@ $results = @()
 
 foreach ($convId in $conversationIds) {
     Write-Progress -Activity "Processing Conversations" -Status $convId -PercentComplete (($results.Count / $conversationIds.Count) * 100)
-    
+
     try {
         $timeline = Get-GCConversationTimeline -BaseUri $baseUri -AccessToken $token -ConversationId $convId
         $export = Export-GCConversationToExcel -ConversationData $timeline -IncludeRawData
         $results += $export
-        
+
         Start-Sleep -Milliseconds 200  # Rate limiting
     } catch {
         Write-Warning "Failed to process $convId : $($_.Exception.Message)"
@@ -555,6 +599,7 @@ Write-Host "Processed $($results.Count) of $($conversationIds.Count) conversatio
 ```
 
 ### 4. Performance Optimization
+
 - Use `-IncludeRawData` only when needed
 - Filter timeline events in PowerShell rather than pulling additional data
 - Consider pagination for large date ranges
@@ -574,6 +619,7 @@ Get-Module -ListAvailable ImportExcel
 ### API Permission Errors
 
 Ensure your OAuth token has these scopes:
+
 - `conversations:readonly`
 - `analytics:readonly`
 - `speechandtextanalytics:readonly`
@@ -583,6 +629,7 @@ Ensure your OAuth token has these scopes:
 ### Rate Limiting
 
 Genesys Cloud has rate limits. If you encounter 429 errors:
+
 ```powershell
 # Add retry logic
 $maxRetries = 3
@@ -604,6 +651,7 @@ do {
 ## Architecture
 
 ### Module Structure
+
 ```
 GenesysCloud.ConversationToolkit/
 ├── GenesysCloud.ConversationToolkit.psd1  # Module manifest
@@ -611,11 +659,13 @@ GenesysCloud.ConversationToolkit/
 ```
 
 ### Internal Components
+
 - **Invoke-GCRequest** - Centralized HTTP request wrapper (module-level helper)
 - **Add-TimelineEvent** - Timeline event normalization (local helper within `Get-GCConversationTimeline`)
 - **6 Exported Functions** - Public API
 
 ### Data Flow
+
 ```
 Genesys Cloud APIs
     ↓
@@ -633,6 +683,7 @@ Professional Excel Report
 ## Version History
 
 ### v0.1.0 (Current)
+
 - Initial release
 - Consolidated Invoke-GCRequest to single module-level function
 - Added Export-GCConversationToExcel with professional formatting

@@ -58,8 +58,36 @@ function Export-GCInsightPackExcel {
     $hasImportExcel = $false
     try { $hasImportExcel = [bool](Get-Module -ListAvailable -Name ImportExcel) } catch { $hasImportExcel = $false }
 
+    function Get-SafeWorksheetName {
+        param(
+            [Parameter(Mandatory)]
+            [string]$Name,
+
+            [Parameter(Mandatory)]
+            [hashtable]$Existing
+        )
+
+        $safe = ($Name -replace '[\\/:\\?\\*\\[\\]]', ' ').Trim()
+        if ([string]::IsNullOrWhiteSpace($safe)) { $safe = 'Sheet' }
+        if ($safe.Length -gt 31) { $safe = $safe.Substring(0, 31).Trim() }
+
+        $base = $safe
+        $i = 1
+        while ($Existing.ContainsKey($safe)) {
+            $suffix = " $i"
+            $trimLen = 31 - $suffix.Length
+            $safe = ($base.Substring(0, [Math]::Min($base.Length, $trimLen)).Trim() + $suffix)
+            $i++
+        }
+
+        $Existing[$safe] = $true
+        return $safe
+    }
+
     if ($hasImportExcel) {
         Import-Module ImportExcel -ErrorAction Stop
+
+        $used = @{}
 
         $metricsRows | Export-Excel -Path $primaryPath `
             -WorksheetName 'Metrics' `
@@ -73,6 +101,44 @@ function Export-GCInsightPackExcel {
             -AutoSize `
             -FreezeTopRow `
             -AppendSheet
+
+        # Metric item sheets
+        $metricIndex = 0
+        foreach ($metric in @($Result.Metrics)) {
+            $metricIndex++
+            if (-not ($metric.PSObject.Properties.Name -contains 'items')) { continue }
+            $items = @($metric.items)
+            if ($items.Count -eq 0) { continue }
+
+            $title = if ($metric.PSObject.Properties.Name -contains 'title' -and $metric.title) { [string]$metric.title } else { "Metric $metricIndex" }
+            $sheet = Get-SafeWorksheetName -Name ("M{0} {1}" -f $metricIndex, $title) -Existing $used
+
+            $items | Export-Excel -Path $primaryPath `
+                -WorksheetName $sheet `
+                -AutoSize `
+                -FreezeTopRow `
+                -AppendSheet
+        }
+
+        # Drilldown sheets
+        $drillIndex = 0
+        foreach ($drill in @($Result.Drilldowns)) {
+            $drillIndex++
+            if (-not $drill) { continue }
+            if (-not ($drill.PSObject.Properties.Name -contains 'items')) { continue }
+            $items = @($drill.items)
+            if ($items.Count -eq 0) { continue }
+
+            $title = if ($drill.PSObject.Properties.Name -contains 'title' -and $drill.title) { [string]$drill.title } else { "Drilldown $drillIndex" }
+            $sheet = Get-SafeWorksheetName -Name ("D{0} {1}" -f $drillIndex, $title) -Existing $used
+
+            $items | Export-Excel -Path $primaryPath `
+                -WorksheetName $sheet `
+                -AutoSize `
+                -FreezeTopRow `
+                -AppendSheet
+        }
+
         $paths += $primaryPath
     }
     else {
@@ -80,7 +146,37 @@ function Export-GCInsightPackExcel {
         $metricsCsv = [System.IO.Path]::ChangeExtension($primaryPath, 'Metrics.csv')
         $stepsCsv = [System.IO.Path]::ChangeExtension($primaryPath, 'Steps.csv')
 
-        foreach ($file in @($metricsCsv, $stepsCsv)) {
+        $extraCsv = @()
+        $metricIndex = 0
+        foreach ($metric in @($Result.Metrics)) {
+            $metricIndex++
+            if (-not ($metric.PSObject.Properties.Name -contains 'items')) { continue }
+            $items = @($metric.items)
+            if ($items.Count -eq 0) { continue }
+            $title = if ($metric.PSObject.Properties.Name -contains 'title' -and $metric.title) { [string]$metric.title } else { "Metric $metricIndex" }
+            $safe = ($title -replace '[^A-Za-z0-9_\\- ]', '') -replace '\\s+', ' '
+            $safe = $safe.Trim()
+            if ([string]::IsNullOrWhiteSpace($safe)) { $safe = "Metric$metricIndex" }
+            if ($safe.Length -gt 40) { $safe = $safe.Substring(0, 40).Trim() }
+            $extraCsv += ([System.IO.Path]::ChangeExtension($primaryPath, ("M{0}_{1}.csv" -f $metricIndex, ($safe -replace ' ', '_'))))
+        }
+
+        $drillIndex = 0
+        foreach ($drill in @($Result.Drilldowns)) {
+            $drillIndex++
+            if (-not $drill) { continue }
+            if (-not ($drill.PSObject.Properties.Name -contains 'items')) { continue }
+            $items = @($drill.items)
+            if ($items.Count -eq 0) { continue }
+            $title = if ($drill.PSObject.Properties.Name -contains 'title' -and $drill.title) { [string]$drill.title } else { "Drilldown $drillIndex" }
+            $safe = ($title -replace '[^A-Za-z0-9_\\- ]', '') -replace '\\s+', ' '
+            $safe = $safe.Trim()
+            if ([string]::IsNullOrWhiteSpace($safe)) { $safe = "Drilldown$drillIndex" }
+            if ($safe.Length -gt 40) { $safe = $safe.Substring(0, 40).Trim() }
+            $extraCsv += ([System.IO.Path]::ChangeExtension($primaryPath, ("D{0}_{1}.csv" -f $drillIndex, ($safe -replace ' ', '_'))))
+        }
+
+        foreach ($file in @($metricsCsv, $stepsCsv) + @($extraCsv)) {
             if ((Test-Path -LiteralPath $file) -and (-not $Force)) {
                 throw "File already exists: $($file). Use -Force to overwrite."
             }
@@ -89,8 +185,33 @@ function Export-GCInsightPackExcel {
         $metricsRows | Export-Csv -LiteralPath $metricsCsv -NoTypeInformation -Encoding utf8
         $stepsRows   | Export-Csv -LiteralPath $stepsCsv   -NoTypeInformation -Encoding utf8
 
+        # Write metric/drilldown item CSVs
+        $extraOut = @()
+        $metricIndex = 0
+        foreach ($metric in @($Result.Metrics)) {
+            $metricIndex++
+            if (-not ($metric.PSObject.Properties.Name -contains 'items')) { continue }
+            $items = @($metric.items)
+            if ($items.Count -eq 0) { continue }
+            $path = $extraCsv[$extraOut.Count]
+            $items | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding utf8
+            $extraOut += $path
+        }
+
+        $drillIndex = 0
+        foreach ($drill in @($Result.Drilldowns)) {
+            $drillIndex++
+            if (-not $drill) { continue }
+            if (-not ($drill.PSObject.Properties.Name -contains 'items')) { continue }
+            $items = @($drill.items)
+            if ($items.Count -eq 0) { continue }
+            $path = $extraCsv[$extraOut.Count]
+            $items | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding utf8
+            $extraOut += $path
+        }
+
         $primaryPath = $metricsCsv
-        $paths = @($metricsCsv, $stepsCsv)
+        $paths = @($metricsCsv, $stepsCsv) + @($extraOut)
     }
 
     return [pscustomobject]@{

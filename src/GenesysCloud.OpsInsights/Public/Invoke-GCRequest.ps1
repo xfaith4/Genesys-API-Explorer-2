@@ -38,7 +38,12 @@ function Invoke-GCRequest {
         [int]$TimeoutSec = 100,
 
         [Parameter()]
-        [int]$MaxAttempts = 6
+        [int]$MaxAttempts = 6,
+
+        # When set, returns an envelope compatible with UI tooling:
+        # { StatusCode, Headers, Content, Parsed }
+        [Parameter()]
+        [switch]$AsResponse
     )
 
     # -------- Context / Defaults --------
@@ -166,9 +171,53 @@ function Invoke-GCRequest {
         }
     }
 
+    function Invoke-GCWebRequest {
+        param([hashtable]$Request)
+
+        $iwrSplat = @{
+            Method      = $Request.Method
+            Uri         = $Request.Uri
+            Headers     = $Request.Headers
+            TimeoutSec  = $Request.TimeoutSec
+            ErrorAction = 'Stop'
+        }
+        if ($Request.Body) { $iwrSplat.Body = $Request.Body }
+
+        if ($PSVersionTable.PSVersion.Major -lt 6) {
+            $iwrSplat.UseBasicParsing = $true
+        }
+
+        $resp = Invoke-WebRequest @iwrSplat
+
+        $content = ''
+        try { $content = [string]$resp.Content } catch { $content = '' }
+
+        $parsed = $null
+        try {
+            if (-not [string]::IsNullOrWhiteSpace($content)) {
+                $parsed = $content | ConvertFrom-Json -ErrorAction Stop
+            }
+        }
+        catch { }
+
+        $headersOut = $null
+        try { $headersOut = $resp.Headers } catch { $headersOut = $null }
+
+        $status = $null
+        try { $status = [int]$resp.StatusCode } catch { $status = $null }
+
+        return [pscustomobject]@{
+            StatusCode = $status
+            Headers    = $headersOut
+            Content    = $content
+            Parsed     = $parsed
+        }
+    }
+
     # -------- Execute w/ retries --------
     $attempt = 0
     $lastErr = $null
+    $lastException = $null
 
     while ($attempt -lt $MaxAttempts) {
         $attempt++
@@ -188,7 +237,12 @@ function Invoke-GCRequest {
                 TimeoutSec = $TimeoutSec
             }
 
-            $response = (& $script:GCInvoker $req)
+            if ($AsResponse) {
+                $response = Invoke-GCWebRequest -Request $req
+            }
+            else {
+                $response = (& $script:GCInvoker $req)
+            }
 
             if ($script:GCContext.TraceEnabled) {
                 Write-GCTraceLine -Message ("[Attempt {0}] Request succeeded for {1} {2}" -f $attempt, $Method, $Uri)
@@ -199,6 +253,7 @@ function Invoke-GCRequest {
         catch {
             $errInfo = Get-GCErrorInfo -Exception $_.Exception
             $lastErr = $errInfo
+            $lastException = $_.Exception
             $code = $errInfo.StatusCode
 
             if ($script:GCContext.TraceEnabled) {
@@ -221,9 +276,17 @@ function Invoke-GCRequest {
                 continue
             }
 
+            if ($AsResponse) {
+                throw
+            }
+
             $detail = ($errInfo | ConvertTo-Json -Depth 10)
             throw "GC request failed (attempt $($attempt) of $($MaxAttempts)) for $($Method) $($Uri). Details: $($detail)"
         }
+    }
+
+    if ($AsResponse -and $lastException) {
+        throw $lastException
     }
 
     $final = ($lastErr | ConvertTo-Json -Depth 10)
