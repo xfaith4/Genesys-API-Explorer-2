@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Genesys Conversation Timeline (Offline)</title>
+    <style>
+        :root {
+            --bg: #0b1020;
+            --panel: #111935;
+            --panel2: #0f1730;
+            --text: #e7ecff;
+            --muted: #a9b4e6;
+            --grid: rgba(255, 255, 255, 0.08);
+            --border: rgba(255, 255, 255, 0.12);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            --trackH: 34px;
+            --leftColW: 320px;
+            --timelineH: 520px;
+            --radius: 14px;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        }
+
+        body {
+            margin: 0;
+            background: radial-gradient(1200px 600px at 20% 0%, #1b2a5a 0%, var(--bg) 55%) fixed;
+            color: var(--text);
+            font-family: var(--sans);
+        }
+
+        .wrap {
+            max-width: 1400px;
+            margin: 18px auto;
+            padding: 0 16px;
+        }
+
+        .card {
+            background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        header {
+            padding: 14px 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 16px;
+            letter-spacing: 0.3px;
+            font-weight: 700;
+        }
+
+        .controls {
+            padding: 12px 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px;
+            align-items: end;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .controls .field label {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .controls input[type="file"],
+        .controls select,
+        .controls input[type="text"] {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 10px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.18);
+            color: var(--text);
+            outline: none;
+        }
+
+        .row2 {
+            padding: 10px 16px 14px 16px;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text);
+            cursor: pointer;
+            font-weight: 650;
+            letter-spacing: 0.2px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.10);
+        }
+
+        .chk {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            color: var(--muted);
+            font-size: 13px;
+            user-select: none;
+        }
+
+        .main {
+            display: grid;
+            grid-template-columns: var(--leftColW) 1fr;
+            min-height: 640px;
+        }
+
+        .left {
+            border-right: 1px solid var(--border);
+            padding: 12px 12px 16px 12px;
+        }
+
+        .kv {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 8px 10px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .kv .k {
+            color: #cdd6ff;
+        }
+
+        .kv .v {
+            font-family: var(--mono);
+            color: var(--text);
+            overflow-wrap: anywhere;
+        }
+
+        .right {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timelineTop {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.12);
+        }
+
+        .timelineTop .meta {
+            color: var(--muted);
+            font-size: 12px;
+            font-family: var(--mono);
+        }
+
+        .viewport {
+            position: relative;
+            height: var(--timelineH);
+            overflow: auto;
+        }
+
+        .grid {
+            position: relative;
+            min-width: 900px;
+        }
+
+        .tracks {
+            position: relative;
+        }
+
+        .track {
+            display: grid;
+            grid-template-columns: var(--leftColW) 1fr;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            align-items: center;
+            height: var(--trackH);
+        }
+
+        .trackLabel {
+            position: sticky;
+            left: 0;
+            z-index: 3;
+            padding: 0 12px;
+            background: linear-gradient(90deg, rgba(17, 25, 53, 0.96) 0%, rgba(17, 25, 53, 0.86) 75%, rgba(17, 25, 53, 0) 100%);
+            color: #dfe6ff;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .lane {
+            position: relative;
+            height: var(--trackH);
+            background-image: linear-gradient(to right, var(--grid) 1px, transparent 1px);
+            background-size: 80px 100%;
+        }
+
+        .bar {
+            position: absolute;
+            top: 6px;
+            height: calc(var(--trackH) - 12px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            box-sizing: border-box;
+            cursor: default;
+            overflow: hidden;
+        }
+
+        .bar .txt {
+            font-size: 11px;
+            padding: 6px 8px;
+            color: rgba(255, 255, 255, 0.92);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+        }
+
+        .marker {
+            position: absolute;
+            top: 2px;
+            width: 2px;
+            height: calc(var(--trackH) - 4px);
+            background: rgba(255, 255, 255, 0.55);
+            border-radius: 2px;
+            opacity: 0.9;
+        }
+
+        .marker.quality {
+            background: rgba(120, 200, 255, 0.85);
+        }
+
+        .marker.metric {
+            background: rgba(255, 210, 120, 0.85);
+        }
+
+        .tooltip {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            max-width: 460px;
+            font-family: var(--mono);
+            font-size: 12px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.82);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #f3f6ff;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+            display: none;
+            white-space: pre-wrap;
+        }
+
+        .hint {
+            padding: 16px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        @media (max-width: 1120px) {
+            .controls {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .main {
+                grid-template-columns: 1fr;
+            }
+
+            .left {
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            :root {
+                --leftColW: 260px;
+                --timelineH: 520px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="card">
+            <header>
+                <h1>Genesys Conversation Timeline (Offline Viewer)</h1>
+            </header>
+
+            <div class="controls">
+                <div class="field">
+                    <label>Conversation Details JSON (API output)</label>
+                    <input id="file" type="file" accept=".json,application/json,text/plain" />
+                </div>
+                <div class="field">
+                    <label>Conversation</label>
+                    <select id="conversationSelect" disabled>
+                        <option value="">Load a file first…</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Find conversationId (filter)</label>
+                    <input id="filter" type="text" placeholder="type to filter dropdown…" disabled />
+                </div>
+                <div class="field">
+                    <label>Actions</label>
+                    <div style="display:flex; gap:10px;">
+                        <button id="btnLoad" class="btn" disabled>Load</button>
+                        <button id="btnExportEvents" class="btn" disabled>Export events CSV</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row2">
+                <label class="chk"><input id="chkMetrics" type="checkbox" checked /> Show metrics markers</label>
+                <label class="chk"><input id="chkQuality" type="checkbox" checked /> Show quality markers</label>
+                <label class="chk"><input id="chkHideWrapup" type="checkbox" /> Hide wrapup segments</label>
+                <label class="chk"><input id="chkGroupByParticipant" type="checkbox" checked /> Group lanes by
+                    participant (not session)</label>
+                <span id="status"
+                    style="margin-left:auto;color:var(--muted);font-size:12px;font-family:var(--mono);"></span>
+            </div>
+
+            <div class="main">
+                <div class="left">
+                    <div class="kv" id="summary">
+                        <div class="k">Status</div>
+                        <div class="v">Load a conversation file.</div>
+                    </div>
+                    <div class="hint">
+                        This renders segments (bars) and optional markers (metrics + mediaEndpointStats) into a
+                        timeline.<br />
+                        Tracks are derived from <span style="font-family:var(--mono);">participants[].sessions[]</span>.
+                    </div>
+                </div>
+
+                <div class="right">
+                    <div class="timelineTop">
+                        <div class="meta" id="timeMeta">—</div>
+                        <div class="meta" id="scaleMeta">grid = 80px</div>
+                    </div>
+
+                    <div class="viewport" id="viewport">
+                        <div class="grid" id="grid">
+                            <div class="tracks" id="tracks"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tooltip" id="tip"></div>
+    </div>
+
+    <script>
+        // ---------------------------
+        // Utilities
+        // ---------------------------
+        function parseDto(s) { return new Date(s); }
+        function ms(n) { return Math.max(0, Number(n || 0)); }
+        function fmtMs(m) {
+            m = ms(m);
+            if (m < 1000) return `${m} ms`;
+            const s = m / 1000;
+            if (s < 60) return `${s.toFixed(2)} s`;
+            const min = Math.floor(s / 60);
+            const rem = s - min * 60;
+            return `${min}m ${rem.toFixed(1)}s`;
+        }
+        function hashHue(str) {
+            let h = 0;
+            for (let i = 0; i < str.length; i++) h = ((h << 5) - h) + str.charCodeAt(i);
+            h = Math.abs(h) % 360;
+            return h;
+        }
+        function barColor(segmentType) {
+            const hue = hashHue(segmentType || "unknown");
+            // consistent but readable
+            return `hsla(${hue}, 70%, 55%, 0.85)`;
+        }
+        function safe(v) { return (v === null || v === undefined) ? "" : String(v); }
+
+        // ---------------------------
+        // State
+        // ---------------------------
+        let root = null;
+        let conversations = [];
+        let convIndex = new Map();
+        let current = null;
+
+        const elFile = document.getElementById('file');
+        const elBtnLoad = document.getElementById('btnLoad');
+        const elSelect = document.getElementById('conversationSelect');
+        const elFilter = document.getElementById('filter');
+        const elStatus = document.getElementById('status');
+        const elSummary = document.getElementById('summary');
+        const elTracks = document.getElementById('tracks');
+        const elTimeMeta = document.getElementById('timeMeta');
+        const elBtnExport = document.getElementById('btnExportEvents');
+
+        const chkMetrics = document.getElementById('chkMetrics');
+        const chkQuality = document.getElementById('chkQuality');
+        const chkHideWrapup = document.getElementById('chkHideWrapup');
+        const chkGroupByParticipant = document.getElementById('chkGroupByParticipant');
+
+        const tip = document.getElementById('tip');
+
+        function setStatus(s) { elStatus.textContent = s; }
+
+        function showTip(x, y, text) {
+            tip.style.display = 'block';
+            tip.textContent = text;
+            const pad = 14;
+            const w = tip.offsetWidth;
+            const h = tip.offsetHeight;
+            let left = x + 14;
+            let top = y + 14;
+            if (left + w + pad > window.innerWidth) left = x - w - 14;
+            if (top + h + pad > window.innerHeight) top = y - h - 14;
+            tip.style.left = `${left}px`;
+            tip.style.top = `${top}px`;
+        }
+        function hideTip() { tip.style.display = 'none'; }
+
+        // ---------------------------
+        // Load + index
+        // ---------------------------
+        elFile.addEventListener('change', () => {
+            elBtnLoad.disabled = !elFile.files || elFile.files.length === 0;
+        });
+
+        elBtnLoad.addEventListener('click', async () => {
+            const f = elFile.files && elFile.files[0];
+            if (!f) return;
+
+            setStatus(`Reading ${f.name}…`);
+            const text = await f.text();
+
+            try {
+                root = JSON.parse(text);
+            } catch (e) {
+                setStatus(`Parse failed: ${e.message}`);
+                alert("JSON parse failed. Make sure this is raw API output (no UI '...' truncation).");
+                return;
+            }
+
+            conversations = Array.isArray(root?.conversations) ? root.conversations : [];
+            convIndex.clear();
+
+            for (const c of conversations) {
+                const id = c.conversationId || c.id || "";
+                if (id) convIndex.set(id, c);
+            }
+
+            setStatus(`Loaded conversations: ${conversations.length}`);
+            buildConversationDropdown();
+            elSelect.disabled = conversations.length === 0;
+            elFilter.disabled = conversations.length === 0;
+            elBtnExport.disabled = conversations.length === 0;
+        });
+
+        function buildConversationDropdown(filterText = "") {
+            const ft = (filterText || "").toLowerCase();
+            const ids = conversations
+                .map(c => c.conversationId || c.id || "")
+                .filter(Boolean)
+                .filter(id => id.toLowerCase().includes(ft))
+                .slice(0, 2000); // guard
+
+            elSelect.innerHTML = "";
+            if (ids.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = "";
+                opt.textContent = "No conversations match filter";
+                elSelect.appendChild(opt);
+                return;
+            }
+
+            for (const id of ids) {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = id;
+                elSelect.appendChild(opt);
+            }
+
+            // Auto-select first match
+            elSelect.value = ids[0];
+            current = convIndex.get(ids[0]);
+            renderConversation(current);
+        }
+
+        elFilter.addEventListener('input', () => {
+            buildConversationDropdown(elFilter.value);
+        });
+
+        elSelect.addEventListener('change', () => {
+            const id = elSelect.value;
+            current = convIndex.get(id);
+            renderConversation(current);
+        });
+
+        // Rerender toggles
+        for (const chk of [chkMetrics, chkQuality, chkHideWrapup, chkGroupByParticipant]) {
+            chk.addEventListener('change', () => {
+                if (current) renderConversation(current);
+            });
+        }
+
+        // ---------------------------
+        // Flattening helpers
+        // ---------------------------
+        function getTracks(conv) {
+            const tracks = new Map(); // trackKey -> { label, lanes:[] }
+            const participants = Array.isArray(conv?.participants) ? conv.participants : [];
+
+            for (const p of participants) {
+                const purpose = safe(p.purpose) || "unknown";
+                const pname = safe(p.participantName) || safe(p.userId) || safe(p.participantId);
+                const sessions = Array.isArray(p?.sessions) ? p.sessions : [];
+
+                for (const s of sessions) {
+                    const mediaType = safe(s.mediaType) || "unknown";
+                    const sid = safe(s.sessionId);
+                    const laneKey = chkGroupByParticipant.checked
+                        ? `${purpose}|${pname}|${mediaType}`
+                        : `${purpose}|${pname}|${mediaType}|${sid}`;
+
+                    const label = chkGroupByParticipant.checked
+                        ? `${purpose}/${mediaType} — ${pname}`
+                        : `${purpose}/${mediaType} — ${pname} — ${sid}`;
+
+                    if (!tracks.has(laneKey)) tracks.set(laneKey, { key: laneKey, label, p, s, segments: [], metrics: [], quality: [] });
+
+                    // Segments
+                    const segments = Array.isArray(s?.segments) ? s.segments : [];
+                    for (const seg of segments) {
+                        if (chkHideWrapup.checked && safe(seg.segmentType) === "wrapup") continue;
+                        tracks.get(laneKey).segments.push(seg);
+                    }
+
+                    // Metrics
+                    const metrics = Array.isArray(s?.metrics) ? s.metrics : [];
+                    tracks.get(laneKey).metrics.push(...metrics);
+
+                    // Quality stats
+                    const q = Array.isArray(s?.mediaEndpointStats) ? s.mediaEndpointStats : [];
+                    tracks.get(laneKey).quality.push(...q);
+                }
+            }
+
+            return Array.from(tracks.values());
+        }
+
+        function computeBounds(conv) {
+            const start = parseDto(conv.conversationStart);
+            const end = parseDto(conv.conversationEnd);
+            let min = start, max = end;
+
+            // If end is missing, infer from segments
+            if (!conv.conversationEnd || isNaN(end.getTime())) {
+                max = start;
+                const participants = Array.isArray(conv?.participants) ? conv.participants : [];
+                for (const p of participants) {
+                    for (const s of (Array.isArray(p?.sessions) ? p.sessions : [])) {
+                        for (const seg of (Array.isArray(s?.segments) ? s.segments : [])) {
+                            if (seg.segmentEnd) {
+                                const t = parseDto(seg.segmentEnd);
+                                if (t > max) max = t;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (min > max) { const tmp = min; min = max; max = tmp; }
+            const durMs = Math.max(1, max - min);
+            return { start: min, end: max, durMs };
+        }
+
+        function toX(t, bounds, widthPx) {
+            const dt = parseDto(t);
+            const rel = (dt - bounds.start) / bounds.durMs;
+            return Math.max(0, Math.min(1, rel)) * widthPx;
+        }
+
+        // ---------------------------
+        // Render
+        // ---------------------------
+        function renderConversation(conv) {
+            if (!conv) return;
+
+            const bounds = computeBounds(conv);
+            const durationLabel = fmtMs(bounds.durMs);
+
+            // Build summary panel
+            const summary = [
+                ["conversationId", safe(conv.conversationId)],
+                ["start", safe(conv.conversationStart)],
+                ["end", safe(conv.conversationEnd) || "(inferred)"],
+                ["duration", durationLabel],
+                ["direction", safe(conv.originatingDirection)],
+                ["divisionIds", Array.isArray(conv.divisionIds) ? conv.divisionIds.join(";") : ""],
+                ["minMOS", safe(conv.mediaStatsMinConversationMos)],
+                ["minRFactor", safe(conv.mediaStatsMinConversationRFactor)],
+                ["participants", String((conv.participants || []).length)]
+            ];
+
+            elSummary.innerHTML = summary.map(([k, v]) =>
+                `<div class="k">${k}</div><div class="v">${escapeHtml(v)}</div>`
+            ).join("");
+
+            elTimeMeta.textContent = `Start: ${safe(conv.conversationStart)}   End: ${safe(conv.conversationEnd) || "(inferred)"}   Duration: ${durationLabel}`;
+
+            // Tracks
+            const tracks = getTracks(conv);
+
+            // Determine width of timeline drawing area based on duration.
+            // Simple heuristic: 80px grid per 5 seconds (voice) but adaptable.
+            const pxPerSec = 18; // tweakable; feels good for investigation work
+            const widthPx = Math.max(1000, Math.ceil((bounds.durMs / 1000) * pxPerSec));
+
+            // Render
+            elTracks.innerHTML = "";
+            elTracks.style.minWidth = `${(parseInt(getComputedStyle(document.documentElement).getPropertyValue('--leftColW')) || 320) + widthPx}px`;
+
+            for (const t of tracks) {
+                const row = document.createElement('div');
+                row.className = 'track';
+
+                const label = document.createElement('div');
+                label.className = 'trackLabel';
+                label.textContent = t.label;
+
+                const lane = document.createElement('div');
+                lane.className = 'lane';
+                lane.style.width = `${widthPx}px`;
+
+                // Segment bars
+                for (const seg of t.segments) {
+                    if (!seg.segmentStart || !seg.segmentEnd) continue;
+
+                    const left = toX(seg.segmentStart, bounds, widthPx);
+                    const right = toX(seg.segmentEnd, bounds, widthPx);
+                    const w = Math.max(2, right - left);
+
+                    const bar = document.createElement('div');
+                    bar.className = 'bar';
+                    bar.style.left = `${left}px`;
+                    bar.style.width = `${w}px`;
+                    bar.style.background = barColor(safe(seg.segmentType));
+
+                    const txt = document.createElement('div');
+                    txt.className = 'txt';
+                    txt.textContent = safe(seg.segmentType) || 'segment';
+                    bar.appendChild(txt);
+
+                    bar.addEventListener('mousemove', (ev) => {
+                        const dur = fmtMs(parseDto(seg.segmentEnd) - parseDto(seg.segmentStart));
+                        const details = [
+                            `segmentType: ${safe(seg.segmentType)}`,
+                            `start: ${safe(seg.segmentStart)}`,
+                            `end:   ${safe(seg.segmentEnd)}`,
+                            `dur:   ${dur}`,
+                            safe(seg.queueId) ? `queueId: ${safe(seg.queueId)}` : "",
+                            safe(seg.disconnectType) ? `disconnectType: ${safe(seg.disconnectType)}` : "",
+                            safe(seg.wrapUpCode) ? `wrapUpCode: ${safe(seg.wrapUpCode)}` : ""
+                        ].filter(Boolean).join("\n");
+                        showTip(ev.clientX, ev.clientY, details);
+                    });
+                    bar.addEventListener('mouseleave', hideTip);
+
+                    lane.appendChild(bar);
+                }
+
+                // Metric markers
+                if (chkMetrics.checked) {
+                    for (const m of t.metrics) {
+                        const dt = m.emitDate || m.eventTime || null;
+                        if (!dt) continue;
+                        const x = toX(dt, bounds, widthPx);
+                        const mk = document.createElement('div');
+                        mk.className = 'marker metric';
+                        mk.style.left = `${x}px`;
+                        mk.addEventListener('mousemove', (ev) => {
+                            const details = [
+                                `metric: ${safe(m.name)}`,
+                                `emit:   ${safe(m.emitDate)}`,
+                                `value:  ${safe(m.value)}`
+                            ].join("\n");
+                            showTip(ev.clientX, ev.clientY, details);
+                        });
+                        mk.addEventListener('mouseleave', hideTip);
+                        lane.appendChild(mk);
+                    }
+                }
+
+                // Quality markers
+                if (chkQuality.checked) {
+                    for (const q of t.quality) {
+                        const dt = q.eventTime || null;
+                        if (!dt) continue;
+                        const x = toX(dt, bounds, widthPx);
+                        const mk = document.createElement('div');
+                        mk.className = 'marker quality';
+                        mk.style.left = `${x}px`;
+                        mk.addEventListener('mousemove', (ev) => {
+                            const details = [
+                                `quality @ ${safe(q.eventTime)}`,
+                                `minMos:        ${safe(q.minMos)}`,
+                                `minRFactor:    ${safe(q.minRFactor)}`,
+                                `maxLatencyMs:  ${safe(q.maxLatencyMs)}`,
+                                `receivedPkts:  ${safe(q.receivedPackets)}`,
+                                `discardedPkts: ${safe(q.discardedPackets)}`,
+                                Array.isArray(q.codecs) ? `codecs: ${q.codecs.join(", ")}` : ""
+                            ].filter(Boolean).join("\n");
+                            showTip(ev.clientX, ev.clientY, details);
+                        });
+                        mk.addEventListener('mouseleave', hideTip);
+                        lane.appendChild(mk);
+                    }
+                }
+
+                row.appendChild(label);
+                row.appendChild(lane);
+                elTracks.appendChild(row);
+            }
+
+            setStatus(`Rendered tracks: ${tracks.length}`);
+        }
+
+        function escapeHtml(s) {
+            return safe(s).replace(/[&<>"']/g, (c) => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+            }[c]));
+        }
+
+        // ---------------------------
+        // Export events CSV
+        // ---------------------------
+        elBtnExport.addEventListener('click', () => {
+            if (!current) return;
+
+            const bounds = computeBounds(current);
+            const rows = [];
+
+            const participants = Array.isArray(current?.participants) ? current.participants : [];
+            for (const p of participants) {
+                const purpose = safe(p.purpose);
+                const pname = safe(p.participantName) || safe(p.userId) || safe(p.participantId);
+
+                for (const s of (Array.isArray(p?.sessions) ? p.sessions : [])) {
+                    const mediaType = safe(s.mediaType);
+                    const sessionId = safe(s.sessionId);
+
+                    // Segments
+                    for (const seg of (Array.isArray(s?.segments) ? s.segments : [])) {
+                        if (chkHideWrapup.checked && safe(seg.segmentType) === "wrapup") continue;
+                        if (!seg.segmentStart || !seg.segmentEnd) continue;
+
+                        const start = parseDto(seg.segmentStart);
+                        const end = parseDto(seg.segmentEnd);
+
+                        rows.push({
+                            kind: "segment",
+                            conversationId: safe(current.conversationId),
+                            participantPurpose: purpose,
+                            participantName: pname,
+                            mediaType,
+                            sessionId,
+                            eventType: safe(seg.segmentType),
+                            eventTime: safe(seg.segmentStart),
+                            endTime: safe(seg.segmentEnd),
+                            durationMs: String(end - start),
+                            offsetMsFromStart: String(start - bounds.start),
+                            queueId: safe(seg.queueId),
+                            disconnectType: safe(seg.disconnectType),
+                            wrapUpCode: safe(seg.wrapUpCode)
+                        });
+                    }
+
+                    // Metrics
+                    for (const m of (Array.isArray(s?.metrics) ? s.metrics : [])) {
+                        const t = m.emitDate || "";
+                        if (!t) continue;
+                        const dt = parseDto(t);
+                        rows.push({
+                            kind: "metric",
+                            conversationId: safe(current.conversationId),
+                            participantPurpose: purpose,
+                            participantName: pname,
+                            mediaType,
+                            sessionId,
+                            eventType: safe(m.name),
+                            eventTime: safe(m.emitDate),
+                            endTime: "",
+                            durationMs: "",
+                            offsetMsFromStart: String(dt - bounds.start),
+                            queueId: "",
+                            disconnectType: "",
+                            wrapUpCode: "",
+                            value: safe(m.value)
+                        });
+                    }
+
+                    // Quality
+                    for (const q of (Array.isArray(s?.mediaEndpointStats) ? s.mediaEndpointStats : [])) {
+                        const t = q.eventTime || "";
+                        if (!t) continue;
+                        const dt = parseDto(t);
+                        rows.push({
+                            kind: "quality",
+                            conversationId: safe(current.conversationId),
+                            participantPurpose: purpose,
+                            participantName: pname,
+                            mediaType,
+                            sessionId,
+                            eventType: "mediaEndpointStats",
+                            eventTime: safe(q.eventTime),
+                            endTime: "",
+                            durationMs: "",
+                            offsetMsFromStart: String(dt - bounds.start),
+                            queueId: "",
+                            disconnectType: "",
+                            wrapUpCode: "",
+                            minMos: safe(q.minMos),
+                            minRFactor: safe(q.minRFactor),
+                            maxLatencyMs: safe(q.maxLatencyMs),
+                            receivedPackets: safe(q.receivedPackets)
+                        });
+                    }
+                }
+            }
+
+            downloadCsv(rows, `conversation_${safe(current.conversationId)}_events.csv`);
+        });
+
+        function downloadCsv(rows, filename) {
+            if (!rows.length) return;
+
+            const cols = Array.from(new Set(rows.flatMap(r => Object.keys(r))));
+            const esc = (v) => {
+                const s = safe(v);
+                if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+                return s;
+            };
+
+            const lines = [];
+            lines.push(cols.join(","));
+            for (const r of rows) {
+                lines.push(cols.map(c => esc(r[c])).join(","));
+            }
+
+            const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+
+</html>
