@@ -17,7 +17,7 @@
             --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
             --trackH: 34px;
             --leftColW: 320px;
-            --timelineH: 520px;
+            --timelineH: 540px;
             --radius: 14px;
             --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
@@ -31,7 +31,7 @@
         }
 
         .wrap {
-            max-width: 1400px;
+            max-width: 1500px;
             margin: 18px auto;
             padding: 0 16px;
         }
@@ -62,7 +62,7 @@
         .controls {
             padding: 12px 16px;
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
+            grid-template-columns: 1.2fr 1fr 1fr 1.2fr;
             gap: 10px;
             align-items: end;
             border-bottom: 1px solid var(--border);
@@ -73,6 +73,39 @@
             font-size: 12px;
             color: var(--muted);
             margin-bottom: 6px;
+        }
+
+        :root {
+            color-scheme: dark;
+        }
+
+        /* nudges native controls toward dark theme */
+
+        .controls input[type="file"],
+        .controls select,
+        .controls input[type="text"],
+        .row2 select {
+            background: rgba(0, 0, 0, 0.45) !important;
+            border: 1px solid rgba(255, 255, 255, 0.20) !important;
+        }
+
+        .controls select:focus,
+        .controls input[type="text"]:focus,
+        .row2 select:focus {
+            border-color: rgba(255, 255, 255, 0.38) !important;
+        }
+
+        /* Chrome/Edge usually respect option styling; Safari is more stubborn */
+        select option,
+        select optgroup {
+            background: #0b1020 !important;
+            /* deep dark */
+            color: #e7ecff !important;
+        }
+
+        /* Also helps on some browsers for the dropdown popup */
+        select {
+            color: #e7ecff;
         }
 
         .controls input[type="file"],
@@ -106,6 +139,7 @@
             cursor: pointer;
             font-weight: 650;
             letter-spacing: 0.2px;
+            white-space: nowrap;
         }
 
         .btn:hover {
@@ -119,12 +153,13 @@
             color: var(--muted);
             font-size: 13px;
             user-select: none;
+            white-space: nowrap;
         }
 
         .main {
             display: grid;
             grid-template-columns: var(--leftColW) 1fr;
-            min-height: 640px;
+            min-height: 660px;
         }
 
         .left {
@@ -162,6 +197,8 @@
             padding: 10px 12px;
             border-bottom: 1px solid var(--border);
             background: rgba(0, 0, 0, 0.12);
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .timelineTop .meta {
@@ -174,11 +211,6 @@
             position: relative;
             height: var(--timelineH);
             overflow: auto;
-        }
-
-        .grid {
-            position: relative;
-            min-width: 900px;
         }
 
         .tracks {
@@ -242,7 +274,7 @@
             height: calc(var(--trackH) - 4px);
             background: rgba(255, 255, 255, 0.55);
             border-radius: 2px;
-            opacity: 0.9;
+            opacity: 0.95;
         }
 
         .marker.quality {
@@ -253,11 +285,26 @@
             background: rgba(255, 210, 120, 0.85);
         }
 
+        .marker.error {
+            background: rgba(255, 90, 90, 0.95);
+            width: 3px;
+        }
+
+        .marker.link {
+            background: rgba(180, 120, 255, 0.95);
+            width: 3px;
+        }
+
+        .marker.link2 {
+            background: rgba(120, 255, 200, 0.90);
+            width: 3px;
+        }
+
         .tooltip {
             position: fixed;
             pointer-events: none;
             z-index: 9999;
-            max-width: 460px;
+            max-width: 620px;
             font-family: var(--mono);
             font-size: 12px;
             padding: 10px 12px;
@@ -271,10 +318,81 @@
         }
 
         .hint {
-            padding: 16px;
+            padding: 14px 16px;
             color: var(--muted);
             font-size: 13px;
             line-height: 1.45;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .bottom {
+            border-top: 1px solid var(--border);
+            padding: 14px 16px 18px 16px;
+            background: rgba(0, 0, 0, 0.10);
+        }
+
+        .bottom h2 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            letter-spacing: 0.2px;
+        }
+
+        .summaryGrid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 16px;
+        }
+
+        .summaryBox {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .summaryBox h3 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: #dfe6ff;
+            letter-spacing: 0.2px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .summaryBox .kv2 {
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            gap: 6px 10px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .summaryBox .kv2 .k {
+            color: #cdd6ff;
+        }
+
+        .summaryBox .kv2 .v {
+            font-family: var(--mono);
+            color: var(--text);
+            overflow-wrap: anywhere;
+        }
+
+        .narrative {
+            margin-top: 10px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #dfe6ff;
+        }
+
+        .narrative code {
+            font-family: var(--mono);
+            color: #ffffff;
+        }
+
+        .tiny {
+            font-size: 12px;
+            color: var(--muted);
+            font-family: var(--mono);
         }
 
         @media (max-width: 1120px) {
@@ -294,6 +412,14 @@
             :root {
                 --leftColW: 260px;
                 --timelineH: 520px;
+            }
+
+            .summaryGrid {
+                grid-template-columns: 1fr;
+            }
+
+            .summaryBox .kv2 {
+                grid-template-columns: 130px 1fr;
             }
         }
     </style>
@@ -323,7 +449,7 @@
                 </div>
                 <div class="field">
                     <label>Actions</label>
-                    <div style="display:flex; gap:10px;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
                         <button id="btnLoad" class="btn" disabled>Load</button>
                         <button id="btnExportEvents" class="btn" disabled>Export events CSV</button>
                     </div>
@@ -331,11 +457,26 @@
             </div>
 
             <div class="row2">
-                <label class="chk"><input id="chkMetrics" type="checkbox" checked /> Show metrics markers</label>
-                <label class="chk"><input id="chkQuality" type="checkbox" checked /> Show quality markers</label>
-                <label class="chk"><input id="chkHideWrapup" type="checkbox" /> Hide wrapup segments</label>
-                <label class="chk"><input id="chkGroupByParticipant" type="checkbox" checked /> Group lanes by
-                    participant (not session)</label>
+                <label class="chk"><input id="chkMetrics" type="checkbox" checked /> Metrics</label>
+                <label class="chk"><input id="chkQuality" type="checkbox" checked /> Quality</label>
+                <label class="chk"><input id="chkErrors" type="checkbox" checked /> Errors</label>
+                <label class="chk"><input id="chkLinks" type="checkbox" checked /> Conversation links</label>
+                <label class="chk"><input id="chkWheelZoom" type="checkbox" /> Wheel zoom (no Ctrl)</label>
+
+                <label class="chk">
+                    Error marker:
+                    <select id="selErrorPos"
+                        style="margin-left:6px; padding:6px 8px; border-radius:10px; border:1px solid var(--border); background:rgba(0,0,0,0.18); color:var(--text);">
+                        <option value="end" selected>End</option>
+                        <option value="start">Start</option>
+                        <option value="both">Both</option>
+                    </select>
+                </label>
+
+                <label class="chk"><input id="chkHideWrapup" type="checkbox" /> Hide wrapup</label>
+                <label class="chk"><input id="chkGroupByParticipant" type="checkbox" checked /> Group by
+                    participant</label>
+
                 <span id="status"
                     style="margin-left:auto;color:var(--muted);font-size:12px;font-family:var(--mono);"></span>
             </div>
@@ -347,24 +488,45 @@
                         <div class="v">Load a conversation file.</div>
                     </div>
                     <div class="hint">
-                        This renders segments (bars) and optional markers (metrics + mediaEndpointStats) into a
-                        timeline.<br />
-                        Tracks are derived from <span style="font-family:var(--mono);">participants[].sessions[]</span>.
+                        Bars = <code>segments</code>. Markers = <code>metrics</code>, <code>mediaEndpointStats</code>,
+                        <code>errorCode</code>, and <code>source/destinationConversationId</code> links.
                     </div>
                 </div>
 
                 <div class="right">
                     <div class="timelineTop">
                         <div class="meta" id="timeMeta">—</div>
-                        <div class="meta" id="scaleMeta">grid = 80px</div>
+                        <div class="meta" id="scaleMeta">—</div>
                     </div>
 
                     <div class="viewport" id="viewport">
-                        <div class="grid" id="grid">
-                            <div class="tracks" id="tracks"></div>
-                        </div>
+                        <div class="tracks" id="tracks"></div>
                     </div>
                 </div>
+            </div>
+
+            <div class="bottom">
+                <h2>Call Flow Summary</h2>
+                <div class="summaryGrid">
+                    <div class="summaryBox">
+                        <h3>High-level</h3>
+                        <div class="kv2" id="flowSummaryHigh"></div>
+                    </div>
+                    <div class="summaryBox">
+                        <h3>Timing</h3>
+                        <div class="kv2" id="flowSummaryTiming"></div>
+                    </div>
+                    <div class="summaryBox">
+                        <h3>Routing</h3>
+                        <div class="kv2" id="flowSummaryRouting"></div>
+                    </div>
+                    <div class="summaryBox">
+                        <h3>Transfers / Links / Errors</h3>
+                        <div class="kv2" id="flowSummaryLinks"></div>
+                    </div>
+                </div>
+                <div class="narrative" id="flowNarrative"></div>
+                <div class="tiny" id="flowFootnote"></div>
             </div>
         </div>
 
@@ -376,7 +538,9 @@
         // Utilities
         // ---------------------------
         function parseDto(s) { return new Date(s); }
+        function safe(v) { return (v === null || v === undefined) ? "" : String(v); }
         function ms(n) { return Math.max(0, Number(n || 0)); }
+
         function fmtMs(m) {
             m = ms(m);
             if (m < 1000) return `${m} ms`;
@@ -386,6 +550,13 @@
             const rem = s - min * 60;
             return `${min}m ${rem.toFixed(1)}s`;
         }
+
+        function escapeHtml(s) {
+            return safe(s).replace(/[&<>"']/g, (c) => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+            }[c]));
+        }
+
         function hashHue(str) {
             let h = 0;
             for (let i = 0; i < str.length; i++) h = ((h << 5) - h) + str.charCodeAt(i);
@@ -394,18 +565,88 @@
         }
         function barColor(segmentType) {
             const hue = hashHue(segmentType || "unknown");
-            // consistent but readable
             return `hsla(${hue}, 70%, 55%, 0.85)`;
         }
-        function safe(v) { return (v === null || v === undefined) ? "" : String(v); }
+
+        function uniq(arr) {
+            const set = new Set(arr.filter(Boolean));
+            return Array.from(set);
+        }
+
+        // Robust object scanning: collect values for keys anywhere in nested objects/arrays.
+        function collectValuesDeep(root, keys) {
+            const want = new Set(keys);
+            const out = [];
+            const stack = [root];
+            while (stack.length) {
+                const cur = stack.pop();
+                if (!cur) continue;
+                if (Array.isArray(cur)) {
+                    for (let i = 0; i < cur.length; i++) stack.push(cur[i]);
+                    continue;
+                }
+                if (typeof cur === "object") {
+                    for (const [k, v] of Object.entries(cur)) {
+                        if (want.has(k)) {
+                            if (Array.isArray(v)) out.push(...v.map(safe));
+                            else out.push(safe(v));
+                        }
+                        if (v && typeof v === "object") stack.push(v);
+                    }
+                }
+            }
+            return uniq(out.filter(Boolean));
+        }
+
+        // Find objects that "look like" flow records anywhere.
+        function collectFlowLikeObjects(root) {
+            const out = [];
+            const stack = [root];
+            while (stack.length) {
+                const cur = stack.pop();
+                if (!cur) continue;
+                if (Array.isArray(cur)) {
+                    for (let i = 0; i < cur.length; i++) stack.push(cur[i]);
+                    continue;
+                }
+                if (typeof cur === "object") {
+                    const hasFlowish =
+                        ("flowId" in cur) || ("flowName" in cur) || ("flowType" in cur) ||
+                        ("transferTargetName" in cur) || ("transferTargetAddress" in cur);
+
+                    if (hasFlowish) out.push(cur);
+
+                    for (const v of Object.values(cur)) {
+                        if (v && typeof v === "object") stack.push(v);
+                    }
+                }
+            }
+            return out;
+        }
 
         // ---------------------------
-        // State
+        // State + elements
         // ---------------------------
         let root = null;
         let conversations = [];
         let convIndex = new Map();
         let current = null;
+        // ### BEGIN: TimelineZoomState
+        let gPxPerSec = 18;          // was hard-coded inside renderConversation
+        const ZOOM_MIN = 4;
+        const ZOOM_MAX = 140;
+        const ZOOM_STEP = 1.12;
+
+        const chkWheelZoom = document.getElementById('chkWheelZoom');
+
+        function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+        function getLeftColW() {
+            const raw = getComputedStyle(document.documentElement).getPropertyValue('--leftColW').trim();
+            const n = parseInt(raw, 10);
+            return Number.isFinite(n) ? n : 320;
+        }
+        // ### END: TimelineZoomState
 
         const elFile = document.getElementById('file');
         const elBtnLoad = document.getElementById('btnLoad');
@@ -415,12 +656,75 @@
         const elSummary = document.getElementById('summary');
         const elTracks = document.getElementById('tracks');
         const elTimeMeta = document.getElementById('timeMeta');
+        const elScaleMeta = document.getElementById('scaleMeta');
         const elBtnExport = document.getElementById('btnExportEvents');
+        // ### BEGIN: TimelineZoomWheelHandler
+        const elViewport = document.getElementById('viewport');
+
+        elViewport.addEventListener('wheel', (ev) => {
+            if (!current) return;
+
+            const wantsZoom = (chkWheelZoom && chkWheelZoom.checked) || ev.ctrlKey; // Ctrl+wheel or toggle
+            if (!wantsZoom) return; // allow normal scrolling
+
+            // We are zooming; stop the page/viewport from scrolling.
+            ev.preventDefault();
+
+            // Determine where the mouse is over the viewport, and preserve the time under cursor.
+            const rect = elViewport.getBoundingClientRect();
+            const xInViewport = ev.clientX - rect.left;
+
+            const leftColW = getLeftColW();
+            const bounds = computeBounds(current);
+
+            // Old width from current zoom
+            const widthOld = Math.max(1000, Math.ceil((bounds.durMs / 1000) * gPxPerSec));
+
+            // Mouse position in the lane content coordinate system (0..widthOld)
+            const laneXOld = clamp((elViewport.scrollLeft + xInViewport - leftColW), 0, widthOld);
+            const rel = widthOld ? (laneXOld / widthOld) : 0;
+
+            // Update zoom
+            const zoomIn = ev.deltaY < 0;
+            const next = zoomIn ? (gPxPerSec * ZOOM_STEP) : (gPxPerSec / ZOOM_STEP);
+            gPxPerSec = clamp(next, ZOOM_MIN, ZOOM_MAX);
+
+            // Preserve scrollTop and compute new scrollLeft to keep rel under cursor
+            const keepTop = elViewport.scrollTop;
+
+            renderConversation(current);
+
+            // New width after re-render
+            const widthNew = Math.max(1000, Math.ceil((bounds.durMs / 1000) * gPxPerSec));
+            const laneXNew = rel * widthNew;
+
+            const newScrollLeft = clamp(
+                (laneXNew - (xInViewport - leftColW)),
+                0,
+                (leftColW + widthNew)
+            );
+
+            elViewport.scrollLeft = newScrollLeft;
+            elViewport.scrollTop = keepTop;
+
+            setStatus(`Zoom: ${gPxPerSec.toFixed(1)} px/sec`);
+        }, { passive: false });
+        // ### END: TimelineZoomWheelHandler
 
         const chkMetrics = document.getElementById('chkMetrics');
         const chkQuality = document.getElementById('chkQuality');
+        const chkErrors = document.getElementById('chkErrors');
+        const chkLinks = document.getElementById('chkLinks');
+        const selErrorPos = document.getElementById('selErrorPos');
         const chkHideWrapup = document.getElementById('chkHideWrapup');
         const chkGroupByParticipant = document.getElementById('chkGroupByParticipant');
+
+        const elFlowHigh = document.getElementById('flowSummaryHigh');
+        const elFlowTiming = document.getElementById('flowSummaryTiming');
+        const elFlowRouting = document.getElementById('flowSummaryRouting');
+        const elFlowLinks = document.getElementById('flowSummaryLinks');
+        const elFlowNarrative = document.getElementById('flowNarrative');
+        const elFlowFootnote = document.getElementById('flowFootnote');
 
         const tip = document.getElementById('tip');
 
@@ -484,7 +788,7 @@
                 .map(c => c.conversationId || c.id || "")
                 .filter(Boolean)
                 .filter(id => id.toLowerCase().includes(ft))
-                .slice(0, 2000); // guard
+                .slice(0, 2000);
 
             elSelect.innerHTML = "";
             if (ids.length === 0) {
@@ -502,67 +806,102 @@
                 elSelect.appendChild(opt);
             }
 
-            // Auto-select first match
             elSelect.value = ids[0];
             current = convIndex.get(ids[0]);
             renderConversation(current);
         }
 
-        elFilter.addEventListener('input', () => {
-            buildConversationDropdown(elFilter.value);
-        });
+        elFilter.addEventListener('input', () => buildConversationDropdown(elFilter.value));
+        elSelect.addEventListener('change', () => { current = convIndex.get(elSelect.value); renderConversation(current); });
 
-        elSelect.addEventListener('change', () => {
-            const id = elSelect.value;
-            current = convIndex.get(id);
-            renderConversation(current);
-        });
-
-        // Rerender toggles
-        for (const chk of [chkMetrics, chkQuality, chkHideWrapup, chkGroupByParticipant]) {
-            chk.addEventListener('change', () => {
-                if (current) renderConversation(current);
-            });
+        for (const el of [chkMetrics, chkQuality, chkErrors, chkLinks, selErrorPos, chkHideWrapup, chkGroupByParticipant]) {
+            el.addEventListener('change', () => { if (current) renderConversation(current); });
         }
 
         // ---------------------------
         // Flattening helpers
         // ---------------------------
-        function getTracks(conv) {
-            const tracks = new Map(); // trackKey -> { label, lanes:[] }
+        function flatten(conv) {
+            const out = [];
             const participants = Array.isArray(conv?.participants) ? conv.participants : [];
-
             for (const p of participants) {
                 const purpose = safe(p.purpose) || "unknown";
                 const pname = safe(p.participantName) || safe(p.userId) || safe(p.participantId);
                 const sessions = Array.isArray(p?.sessions) ? p.sessions : [];
+                for (const s of sessions) {
+                    const mediaType = safe(s.mediaType) || "unknown";
+                    const sessionId = safe(s.sessionId);
+                    const segments = Array.isArray(s?.segments) ? s.segments : [];
+                    for (const seg of segments) {
+                        out.push({ purpose, pname, mediaType, sessionId, participant: p, session: s, seg });
+                    }
+                }
+            }
+            return out;
+        }
 
+        function flattenMetrics(conv) {
+            const out = [];
+            const participants = Array.isArray(conv?.participants) ? conv.participants : [];
+            for (const p of participants) {
+                const purpose = safe(p.purpose) || "unknown";
+                const pname = safe(p.participantName) || safe(p.userId) || safe(p.participantId);
+                const sessions = Array.isArray(p?.sessions) ? p.sessions : [];
+                for (const s of sessions) {
+                    const mediaType = safe(s.mediaType) || "unknown";
+                    const sessionId = safe(s.sessionId);
+                    const metrics = Array.isArray(s?.metrics) ? s.metrics : [];
+                    for (const m of metrics) out.push({ purpose, pname, mediaType, sessionId, participant: p, session: s, m });
+                }
+            }
+            return out;
+        }
+
+        function getTracks(conv) {
+            const tracks = new Map();
+            const flat = flatten(conv);
+
+            for (const x of flat) {
+                const sid = x.sessionId;
+                const laneKey = chkGroupByParticipant.checked
+                    ? `${x.purpose}|${x.pname}|${x.mediaType}`
+                    : `${x.purpose}|${x.pname}|${x.mediaType}|${sid}`;
+
+                const label = chkGroupByParticipant.checked
+                    ? `${x.purpose}/${x.mediaType} — ${x.pname}`
+                    : `${x.purpose}/${x.mediaType} — ${x.pname} — ${sid}`;
+
+                if (!tracks.has(laneKey)) tracks.set(laneKey, {
+                    key: laneKey, label,
+                    segments: [], metrics: [], quality: [], // populated later
+                });
+
+                if (!(chkHideWrapup.checked && safe(x.seg.segmentType) === "wrapup")) {
+                    tracks.get(laneKey).segments.push(x);
+                }
+            }
+
+            // attach metrics/quality per lane by scanning sessions
+            // (simple: add all metrics/quality from each session to any lane that belongs to it)
+            const participants = Array.isArray(conv?.participants) ? conv.participants : [];
+            for (const p of participants) {
+                const purpose = safe(p.purpose) || "unknown";
+                const pname = safe(p.participantName) || safe(p.userId) || safe(p.participantId);
+                const sessions = Array.isArray(p?.sessions) ? p.sessions : [];
                 for (const s of sessions) {
                     const mediaType = safe(s.mediaType) || "unknown";
                     const sid = safe(s.sessionId);
+
                     const laneKey = chkGroupByParticipant.checked
                         ? `${purpose}|${pname}|${mediaType}`
                         : `${purpose}|${pname}|${mediaType}|${sid}`;
 
-                    const label = chkGroupByParticipant.checked
-                        ? `${purpose}/${mediaType} — ${pname}`
-                        : `${purpose}/${mediaType} — ${pname} — ${sid}`;
+                    if (!tracks.has(laneKey)) continue;
 
-                    if (!tracks.has(laneKey)) tracks.set(laneKey, { key: laneKey, label, p, s, segments: [], metrics: [], quality: [] });
-
-                    // Segments
-                    const segments = Array.isArray(s?.segments) ? s.segments : [];
-                    for (const seg of segments) {
-                        if (chkHideWrapup.checked && safe(seg.segmentType) === "wrapup") continue;
-                        tracks.get(laneKey).segments.push(seg);
-                    }
-
-                    // Metrics
                     const metrics = Array.isArray(s?.metrics) ? s.metrics : [];
-                    tracks.get(laneKey).metrics.push(...metrics);
-
-                    // Quality stats
                     const q = Array.isArray(s?.mediaEndpointStats) ? s.mediaEndpointStats : [];
+
+                    tracks.get(laneKey).metrics.push(...metrics);
                     tracks.get(laneKey).quality.push(...q);
                 }
             }
@@ -575,18 +914,13 @@
             const end = parseDto(conv.conversationEnd);
             let min = start, max = end;
 
-            // If end is missing, infer from segments
             if (!conv.conversationEnd || isNaN(end.getTime())) {
                 max = start;
-                const participants = Array.isArray(conv?.participants) ? conv.participants : [];
-                for (const p of participants) {
-                    for (const s of (Array.isArray(p?.sessions) ? p.sessions : [])) {
-                        for (const seg of (Array.isArray(s?.segments) ? s.segments : [])) {
-                            if (seg.segmentEnd) {
-                                const t = parseDto(seg.segmentEnd);
-                                if (t > max) max = t;
-                            }
-                        }
+                const flat = flatten(conv);
+                for (const x of flat) {
+                    if (x.seg.segmentEnd) {
+                        const t = parseDto(x.seg.segmentEnd);
+                        if (t > max) max = t;
                     }
                 }
             }
@@ -603,7 +937,308 @@
         }
 
         // ---------------------------
-        // Render
+        // Skills + Flow/Queue extraction (robust)
+        // ---------------------------
+        function extractSkills(conv) {
+            // cover common field name variants
+            const keys = [
+                "requestedRoutingSkillId", "requestedRoutingSkillIds",
+                "activeSkillId", "activeSkillIds",
+                "removedSkillId", "removedSkillIds",
+                "routingSkillId", "routingSkillIds",
+            ];
+            return collectValuesDeep(conv, keys);
+        }
+
+        function extractFlows(conv) {
+            // find flow-like objects and pick the most meaningful (with flowName)
+            const flows = collectFlowLikeObjects(conv)
+                .map(f => ({
+                    flowId: safe(f.flowId),
+                    flowName: safe(f.flowName),
+                    flowType: safe(f.flowType),
+                    flowVersion: safe(f.flowVersion),
+                    startingLanguage: safe(f.startingLanguage),
+                    transferTargetAddress: safe(f.transferTargetAddress),
+                    transferTargetName: safe(f.transferTargetName),
+                    queueId: safe(f.queueId),
+                    queueName: safe(f.queueName),
+                }));
+
+            const withName = flows.find(x => x.flowName) || flows.find(x => x.flowId) || null;
+            return { flows, primary: withName };
+        }
+
+        function extractQueue(conv) {
+            // Preference order:
+            // 1) any explicit queueName (if present)
+            // 2) transferTargetName if it looks like a queue transfer
+            // 3) queueId from segments
+            const queueNames = collectValuesDeep(conv, ["queueName"]);
+            const transferNames = collectValuesDeep(conv, ["transferTargetName"]);
+            const queueIds = collectValuesDeep(conv, ["queueId"]);
+
+            const qName = queueNames[0] || transferNames[0] || "";
+            const qId = queueIds[0] || "";
+
+            return { queueName: qName, queueId: qId, transferTargetName: transferNames[0] || "", transferTargetAddress: collectValuesDeep(conv, ["transferTargetAddress"])[0] || "" };
+        }
+
+        function extractAniDnis(conv) {
+            // Prefer voice customer/external sessions
+            const participants = Array.isArray(conv?.participants) ? conv.participants : [];
+            let best = null;
+
+            for (const p of participants) {
+                const purpose = safe(p.purpose);
+                const sessions = Array.isArray(p?.sessions) ? p.sessions : [];
+                for (const s of sessions) {
+                    if (safe(s.mediaType) !== "voice") continue;
+                    const score = (purpose === "customer" || purpose === "external") ? 3 :
+                        (purpose === "ivr") ? 2 :
+                            (purpose === "acd") ? 1 : 0;
+                    const candidate = { score, purpose, s };
+                    if (!best || candidate.score > best.score) best = candidate;
+                }
+            }
+
+            const s = best?.s || {};
+            return {
+                ani: safe(s.ani),
+                dnis: safe(s.dnis),
+                sessionDnis: safe(s.sessionDnis),
+                protocolCallId: safe(s.protocolCallId),
+                edgeId: safe(s.edgeId),
+                provider: safe(s.provider),
+                remote: safe(s.remote),
+                selectedAgentId: safe(s.selectedAgentId),
+                usedRouting: safe(s.usedRouting),
+                requestedRouting: safe(s.requestedRouting),
+            };
+        }
+
+        function extractAgent(conv) {
+            const flat = flatten(conv)
+                .filter(x => x.purpose === "agent" && x.mediaType === "voice" && x.seg.segmentStart);
+
+            // prefer last "interact" segment agent
+            const cand = flat
+                .filter(x => safe(x.seg.segmentType) === "interact")
+                .sort((a, b) => parseDto(a.seg.segmentStart) - parseDto(b.seg.segmentStart));
+
+            const pick = cand.length ? cand[cand.length - 1] : (flat[0] || null);
+            if (!pick) return { agentName: "", agentUserId: "" };
+
+            return {
+                agentName: safe(pick.participant.participantName) || safe(pick.participant.name) || pick.pname,
+                agentUserId: safe(pick.participant.userId),
+            };
+        }
+
+        function extractQueueTime(conv) {
+            // Prefer metrics tAcd/tWait if present
+            const mets = flattenMetrics(conv);
+
+            function findMetric(name, preferredPurposes) {
+                const hits = mets.filter(x => safe(x.m.name) === name && x.m.emitDate);
+                const scored = hits.map(x => {
+                    const p = x.purpose;
+                    const score = preferredPurposes.includes(p) ? 2 : 1;
+                    return { score, x };
+                }).sort((a, b) => b.score - a.score);
+                return scored.length ? scored[0].x : null;
+            }
+
+            const mAcd = findMetric("tAcd", ["acd"]);
+            if (mAcd) return { source: "metric:tAcd", valueMs: Number(mAcd.m.value) };
+
+            const mWait = findMetric("tWait", ["acd"]);
+            if (mWait) return { source: "metric:tWait", valueMs: Number(mWait.m.value) };
+
+            // Fallback: first ACD segmentStart -> first agent alert start
+            const flat = flatten(conv);
+            const acdStart = flat
+                .filter(x => x.purpose === "acd" && x.seg.segmentStart)
+                .map(x => parseDto(x.seg.segmentStart))
+                .sort((a, b) => a - b)[0] || null;
+
+            const agentAlert = flat
+                .filter(x => x.purpose === "agent" && safe(x.seg.segmentType) === "alert" && x.seg.segmentStart)
+                .map(x => parseDto(x.seg.segmentStart))
+                .sort((a, b) => a - b)[0] || null;
+
+            if (acdStart && agentAlert) return { source: "derived:acdStart->agentAlert", valueMs: (agentAlert - acdStart) };
+
+            return { source: "", valueMs: null };
+        }
+
+        // ---------------------------
+        // Link / transfer / conference analysis
+        // ---------------------------
+        function classifyLinkEvent(seg) {
+            const disc = safe(seg.disconnectType);
+            const conf = (seg.conference === true) || safe(seg.conference) === "true";
+            const st = safe(seg.segmentType);
+
+            // Heuristics: "what happened" label
+            if (conf && (disc.includes("conference") || safe(seg.destinationConversationId))) return "conference spawned new conversation";
+            if (disc.includes("consult")) return "consult transfer / consult leg";
+            if (disc.includes("transfer")) return "transfer created new conversation/session";
+            if (st === "ivr" && safe(seg.destinationConversationId)) return "flow/ivr handoff created new conversation";
+            return "conversation/session link event";
+        }
+
+        function extractLinks(conv) {
+            const flat = flatten(conv);
+            const links = [];
+
+            for (const x of flat) {
+                const seg = x.seg || {};
+                const srcC = safe(seg.sourceConversationId);
+                const dstC = safe(seg.destinationConversationId);
+                const srcS = safe(seg.sourceSessionId);
+                const dstS = safe(seg.destinationSessionId);
+
+                if (srcC || dstC || srcS || dstS) {
+                    links.push({
+                        whenStart: safe(seg.segmentStart),
+                        whenEnd: safe(seg.segmentEnd),
+                        segmentType: safe(seg.segmentType),
+                        purpose: x.purpose,
+                        mediaType: x.mediaType,
+                        disconnectType: safe(seg.disconnectType),
+                        conference: safe(seg.conference),
+                        sourceConversationId: srcC,
+                        destinationConversationId: dstC,
+                        sourceSessionId: srcS,
+                        destinationSessionId: dstS,
+                        label: classifyLinkEvent(seg),
+                    });
+                }
+            }
+
+            // De-dupe by tuple
+            const key = (l) => [
+                l.sourceConversationId, l.destinationConversationId,
+                l.sourceSessionId, l.destinationSessionId,
+                l.whenStart, l.whenEnd, l.segmentType, l.purpose
+            ].join("|");
+
+            const seen = new Set();
+            const out = [];
+            for (const l of links) {
+                const k = key(l);
+                if (!seen.has(k)) { seen.add(k); out.push(l); }
+            }
+
+            // Sort by time
+            out.sort((a, b) => (parseDto(a.whenStart || a.whenEnd || 0) - parseDto(b.whenStart || b.whenEnd || 0)));
+            return out;
+        }
+
+        // ---------------------------
+        // Render summary (bottom)
+        // ---------------------------
+        function kv(el, pairs) {
+            el.innerHTML = pairs.map(([k, v]) =>
+                `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div>`
+            ).join("");
+        }
+
+        function renderCallFlowSummary(conv) {
+            const bounds = computeBounds(conv);
+            const ad = extractAniDnis(conv);
+            const ag = extractAgent(conv);
+            const skills = extractSkills(conv);
+            const flows = extractFlows(conv);
+            const q = extractQueue(conv);
+            const qt = extractQueueTime(conv);
+            const links = extractLinks(conv);
+
+            const minMos = safe(conv.mediaStatsMinConversationMos);
+            const minR = safe(conv.mediaStatsMinConversationRFactor);
+
+            // errors in segments
+            const errorCodes = collectValuesDeep(conv, ["errorCode"]);
+            const destConvs = uniq(links.map(l => l.destinationConversationId).filter(Boolean));
+            const srcConvs = uniq(links.map(l => l.sourceConversationId).filter(Boolean));
+
+            kv(elFlowHigh, [
+                ["Direction", safe(conv.originatingDirection)],
+                ["ANI", ad.ani],
+                ["DNIS", ad.dnis || ad.sessionDnis],
+                ["ConversationId", safe(conv.conversationId)],
+                ["QueueName", q.queueName || q.transferTargetName],
+                ["QueueId", q.queueId],
+            ]);
+
+            kv(elFlowTiming, [
+                ["Start", safe(conv.conversationStart)],
+                ["End", safe(conv.conversationEnd)],
+                ["Duration", fmtMs(bounds.durMs)],
+                ["QueueWait", (qt.valueMs !== null) ? `${fmtMs(qt.valueMs)} (${qt.source})` : ""],
+                ["Min MOS / R", [minMos, minR].filter(Boolean).join(" / ")],
+            ]);
+
+            // Prefer your flowName/flowId from details
+            const p = flows.primary || {};
+            kv(elFlowRouting, [
+                ["FlowName", p.flowName],
+                ["FlowId", p.flowId],
+                ["FlowType", p.flowType],
+                ["FlowVersion", p.flowVersion],
+                ["Skills", skills.length ? skills.join(";") : ""],
+                ["Agent", ag.agentName || ag.agentUserId || ad.selectedAgentId],
+                ["Routing", [ad.requestedRouting, ad.usedRouting].filter(Boolean).join(" → ")],
+            ]);
+
+            const linkSummary = [
+                ["Linked from", srcConvs.length ? srcConvs.join(";") : ""],
+                ["Linked to", destConvs.length ? destConvs.join(";") : ""],
+                ["TransferTargetName", q.transferTargetName],
+                ["TransferTargetAddress", q.transferTargetAddress],
+                ["ErrorCodes", errorCodes.length ? errorCodes.join(";") : ""],
+            ];
+            kv(elFlowLinks, linkSummary);
+
+            // Narrative: investigator style, time-ordered highlights
+            const headlineParts = [];
+            headlineParts.push(`${escapeHtml(safe(conv.originatingDirection) || "unknown")} voice interaction`);
+            if (ad.ani || (ad.dnis || ad.sessionDnis)) headlineParts.push(`(${escapeHtml(ad.ani || "ANI ?")} → ${escapeHtml(ad.dnis || ad.sessionDnis || "DNIS ?")})`);
+            if (p.flowName) headlineParts.push(`via flow <code>${escapeHtml(p.flowName)}</code>`);
+            if (q.queueName || q.transferTargetName) headlineParts.push(`offered to <code>${escapeHtml(q.queueName || q.transferTargetName)}</code>`);
+            if (qt.valueMs !== null) headlineParts.push(`waited ~<code>${escapeHtml(fmtMs(qt.valueMs))}</code>`);
+            if (ag.agentName || ag.agentUserId || ad.selectedAgentId) headlineParts.push(`routed to <code>${escapeHtml(ag.agentName || ag.agentUserId || ad.selectedAgentId)}</code>`);
+            const headline = headlineParts.join(" ");
+
+            let linkNarr = "";
+            if (links.length) {
+                const lines = links.slice(0, 10).map(l => {
+                    const t = l.whenEnd || l.whenStart || "";
+                    const src = l.sourceConversationId ? `srcConv=${l.sourceConversationId}` : "";
+                    const dst = l.destinationConversationId ? `dstConv=${l.destinationConversationId}` : "";
+                    const disc = l.disconnectType ? `disconnect=${l.disconnectType}` : "";
+                    const conf = l.conference ? `conference=${l.conference}` : "";
+                    const where = [src, dst, disc, conf].filter(Boolean).join(", ");
+                    return `• ${escapeHtml(t)} — ${escapeHtml(l.label)} (${escapeHtml(l.segmentType)}/${escapeHtml(l.purpose)}): ${escapeHtml(where)}`;
+                }).join("<br/>");
+
+                linkNarr = `<br/><br/><strong>Conversation link events (conference/transfer/consult/handoffs):</strong><br/>${lines}`;
+            }
+
+            let errNarr = "";
+            if (errorCodes.length) {
+                errNarr = `<br/><br/><strong>Errors observed:</strong> <code>${escapeHtml(errorCodes.join(", "))}</code>`;
+            }
+
+            elFlowNarrative.innerHTML = `${headline}.${linkNarr}${errNarr}`;
+
+            elFlowFootnote.textContent =
+                "Note: This summary uses best-effort inference from segment/session fields + flow/transfer metadata present in the detail record.";
+        }
+
+        // ---------------------------
+        // Render conversation timeline
         // ---------------------------
         function renderConversation(conv) {
             if (!conv) return;
@@ -611,7 +1246,6 @@
             const bounds = computeBounds(conv);
             const durationLabel = fmtMs(bounds.durMs);
 
-            // Build summary panel
             const summary = [
                 ["conversationId", safe(conv.conversationId)],
                 ["start", safe(conv.conversationStart)],
@@ -625,23 +1259,32 @@
             ];
 
             elSummary.innerHTML = summary.map(([k, v]) =>
-                `<div class="k">${k}</div><div class="v">${escapeHtml(v)}</div>`
+                `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div>`
             ).join("");
 
             elTimeMeta.textContent = `Start: ${safe(conv.conversationStart)}   End: ${safe(conv.conversationEnd) || "(inferred)"}   Duration: ${durationLabel}`;
 
-            // Tracks
-            const tracks = getTracks(conv);
-
-            // Determine width of timeline drawing area based on duration.
-            // Simple heuristic: 80px grid per 5 seconds (voice) but adaptable.
-            const pxPerSec = 18; // tweakable; feels good for investigation work
+            // scale
+            // ### BEGIN: UseZoomScale
+            const pxPerSec = gPxPerSec;
             const widthPx = Math.max(1000, Math.ceil((bounds.durMs / 1000) * pxPerSec));
+            elScaleMeta.textContent = `Scale: ~${pxPerSec.toFixed(1)}px/sec  |  Width: ${widthPx}px`;
+            // ### END: UseZoomScale
 
-            // Render
+
+            // bottom summary
+            renderCallFlowSummary(conv);
+
+            // build tracks
+            const tracks = getTracks(conv);
             elTracks.innerHTML = "";
             elTracks.style.minWidth = `${(parseInt(getComputedStyle(document.documentElement).getPropertyValue('--leftColW')) || 320) + widthPx}px`;
 
+            const errorPos = selErrorPos.value; // start|end|both
+            const links = extractLinks(conv);
+
+            // For quick lookup: link events by segmentStart/End + ids
+            // We'll render link markers directly while iterating segments (cheaper).
             for (const t of tracks) {
                 const row = document.createElement('div');
                 row.className = 'track';
@@ -654,8 +1297,9 @@
                 lane.className = 'lane';
                 lane.style.width = `${widthPx}px`;
 
-                // Segment bars
-                for (const seg of t.segments) {
+                // segment bars
+                for (const x of t.segments) {
+                    const seg = x.seg || {};
                     if (!seg.segmentStart || !seg.segmentEnd) continue;
 
                     const left = toX(seg.segmentStart, bounds, widthPx);
@@ -676,19 +1320,118 @@
                     bar.addEventListener('mousemove', (ev) => {
                         const dur = fmtMs(parseDto(seg.segmentEnd) - parseDto(seg.segmentStart));
                         const details = [
-                            `segmentType: ${safe(seg.segmentType)}`,
-                            `start: ${safe(seg.segmentStart)}`,
-                            `end:   ${safe(seg.segmentEnd)}`,
-                            `dur:   ${dur}`,
-                            safe(seg.queueId) ? `queueId: ${safe(seg.queueId)}` : "",
-                            safe(seg.disconnectType) ? `disconnectType: ${safe(seg.disconnectType)}` : "",
-                            safe(seg.wrapUpCode) ? `wrapUpCode: ${safe(seg.wrapUpCode)}` : ""
+                            `segmentType:            ${safe(seg.segmentType)}`,
+                            `participantPurpose:     ${x.purpose}`,
+                            `mediaType:              ${x.mediaType}`,
+                            `start:                  ${safe(seg.segmentStart)}`,
+                            `end:                    ${safe(seg.segmentEnd)}`,
+                            `dur:                    ${dur}`,
+                            safe(seg.queueId) ? `queueId:                ${safe(seg.queueId)}` : "",
+                            safe(seg.queueName) ? `queueName:              ${safe(seg.queueName)}` : "",
+                            (seg.conference === true || safe(seg.conference) === "true") ? `conference:             ${safe(seg.conference)}` : "",
+                            safe(seg.disconnectType) ? `disconnectType:         ${safe(seg.disconnectType)}` : "",
+                            safe(seg.errorCode) ? `errorCode:              ${safe(seg.errorCode)}` : "",
+                            safe(seg.sipResponseCode) ? `sipResponseCode:        ${safe(seg.sipResponseCode)}` : "",
+                            safe(seg.q850ResponseCode) ? `q850ResponseCode:       ${safe(seg.q850ResponseCode)}` : "",
+                            safe(seg.sourceConversationId) ? `sourceConversationId:   ${safe(seg.sourceConversationId)}` : "",
+                            safe(seg.destinationConversationId) ? `destinationConversationId:${safe(seg.destinationConversationId)}` : "",
+                            safe(seg.sourceSessionId) ? `sourceSessionId:        ${safe(seg.sourceSessionId)}` : "",
+                            safe(seg.destinationSessionId) ? `destinationSessionId:   ${safe(seg.destinationSessionId)}` : "",
+                            safe(seg.wrapUpCode) ? `wrapUpCode:             ${safe(seg.wrapUpCode)}` : "",
                         ].filter(Boolean).join("\n");
                         showTip(ev.clientX, ev.clientY, details);
                     });
                     bar.addEventListener('mouseleave', hideTip);
 
                     lane.appendChild(bar);
+
+                    // ERROR markers
+                    if (chkErrors.checked && (safe(seg.errorCode) || safe(seg.disconnectType) === "error")) {
+                        const places = [];
+                        if (errorPos === "start" || errorPos === "both") places.push(seg.segmentStart);
+                        if (errorPos === "end" || errorPos === "both") places.push(seg.segmentEnd);
+
+                        for (const when of places) {
+                            const xPos = toX(when, bounds, widthPx);
+                            const mk = document.createElement('div');
+                            mk.className = 'marker error';
+                            mk.style.left = `${xPos}px`;
+
+                            mk.addEventListener('mousemove', (ev) => {
+                                const details = [
+                                    `ERROR marker`,
+                                    `when:          ${safe(when)}`,
+                                    `segmentType:   ${safe(seg.segmentType)}`,
+                                    safe(seg.disconnectType) ? `disconnectType:${safe(seg.disconnectType)}` : "",
+                                    safe(seg.errorCode) ? `errorCode:     ${safe(seg.errorCode)}` : "",
+                                    safe(seg.sipResponseCode) ? `sip:          ${safe(seg.sipResponseCode)}` : "",
+                                    safe(seg.q850ResponseCode) ? `q850:         ${safe(seg.q850ResponseCode)}` : ""
+                                ].filter(Boolean).join("\n");
+                                showTip(ev.clientX, ev.clientY, details);
+                            });
+                            mk.addEventListener('mouseleave', hideTip);
+
+                            lane.appendChild(mk);
+                        }
+                    }
+
+                    // LINK markers for src/dst conversation/session IDs
+                    if (chkLinks.checked && (safe(seg.destinationConversationId) || safe(seg.sourceConversationId) || safe(seg.destinationSessionId) || safe(seg.sourceSessionId))) {
+                        // Place link marker at end by default (because it tends to be "resulting in")
+                        const when = seg.segmentEnd || seg.segmentStart;
+                        if (when) {
+                            const xPos = toX(when, bounds, widthPx);
+                            const mk = document.createElement('div');
+                            mk.className = 'marker link';
+                            mk.style.left = `${xPos}px`;
+
+                            mk.addEventListener('mousemove', (ev) => {
+                                const label = classifyLinkEvent(seg);
+                                const details = [
+                                    `LINK marker`,
+                                    `when:          ${safe(when)}`,
+                                    `likely:        ${label}`,
+                                    `segmentType:   ${safe(seg.segmentType)}`,
+                                    `purpose/media: ${x.purpose}/${x.mediaType}`,
+                                    safe(seg.disconnectType) ? `disconnectType:${safe(seg.disconnectType)}` : "",
+                                    (seg.conference === true || safe(seg.conference) === "true") ? `conference:    ${safe(seg.conference)}` : "",
+                                    safe(seg.sourceConversationId) ? `sourceConversationId: ${safe(seg.sourceConversationId)}` : "",
+                                    safe(seg.destinationConversationId) ? `destinationConversationId: ${safe(seg.destinationConversationId)}` : "",
+                                    safe(seg.sourceSessionId) ? `sourceSessionId: ${safe(seg.sourceSessionId)}` : "",
+                                    safe(seg.destinationSessionId) ? `destinationSessionId: ${safe(seg.destinationSessionId)}` : "",
+                                ].filter(Boolean).join("\n");
+                                showTip(ev.clientX, ev.clientY, details);
+                            });
+                            mk.addEventListener('mouseleave', hideTip);
+
+                            lane.appendChild(mk);
+
+                            // Optional: second marker at start for source
+                            if (safe(seg.sourceConversationId) || safe(seg.sourceSessionId)) {
+                                const when2 = seg.segmentStart;
+                                if (when2) {
+                                    const x2 = toX(when2, bounds, widthPx);
+                                    const mk2 = document.createElement('div');
+                                    mk2.className = 'marker link2';
+                                    mk2.style.left = `${x2}px`;
+
+                                    mk2.addEventListener('mousemove', (ev) => {
+                                        const details = [
+                                            `LINK (source) marker`,
+                                            `when:          ${safe(when2)}`,
+                                            `segmentType:   ${safe(seg.segmentType)}`,
+                                            safe(seg.sourceConversationId) ? `sourceConversationId: ${safe(seg.sourceConversationId)}` : "",
+                                            safe(seg.sourceSessionId) ? `sourceSessionId: ${safe(seg.sourceSessionId)}` : "",
+                                        ].filter(Boolean).join("\n");
+                                        showTip(ev.clientX, ev.clientY, details);
+                                    });
+                                    mk2.addEventListener('mouseleave', hideTip);
+
+                                    lane.appendChild(mk2);
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Metric markers
@@ -696,10 +1439,10 @@
                     for (const m of t.metrics) {
                         const dt = m.emitDate || m.eventTime || null;
                         if (!dt) continue;
-                        const x = toX(dt, bounds, widthPx);
+                        const xPos = toX(dt, bounds, widthPx);
                         const mk = document.createElement('div');
                         mk.className = 'marker metric';
-                        mk.style.left = `${x}px`;
+                        mk.style.left = `${xPos}px`;
                         mk.addEventListener('mousemove', (ev) => {
                             const details = [
                                 `metric: ${safe(m.name)}`,
@@ -718,10 +1461,10 @@
                     for (const q of t.quality) {
                         const dt = q.eventTime || null;
                         if (!dt) continue;
-                        const x = toX(dt, bounds, widthPx);
+                        const xPos = toX(dt, bounds, widthPx);
                         const mk = document.createElement('div');
                         mk.className = 'marker quality';
-                        mk.style.left = `${x}px`;
+                        mk.style.left = `${xPos}px`;
                         mk.addEventListener('mousemove', (ev) => {
                             const details = [
                                 `quality @ ${safe(q.eventTime)}`,
@@ -747,20 +1490,20 @@
             setStatus(`Rendered tracks: ${tracks.length}`);
         }
 
-        function escapeHtml(s) {
-            return safe(s).replace(/[&<>"']/g, (c) => ({
-                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
-            }[c]));
-        }
-
         // ---------------------------
-        // Export events CSV
+        // Export events CSV (v3: skills + flow + links + transfer)
         // ---------------------------
-        elBtnExport.addEventListener('click', () => {
+        elBtnExport.addEventListener("click", () => {
             if (!current) return;
 
             const bounds = computeBounds(current);
             const rows = [];
+
+            const skillsAll = extractSkills(current);
+            const flows = extractFlows(current);
+            const primaryFlow = flows.primary || {};
+            const queue = extractQueue(current);
+            const links = extractLinks(current);
 
             const participants = Array.isArray(current?.participants) ? current.participants : [];
             for (const p of participants) {
@@ -771,7 +1514,6 @@
                     const mediaType = safe(s.mediaType);
                     const sessionId = safe(s.sessionId);
 
-                    // Segments
                     for (const seg of (Array.isArray(s?.segments) ? s.segments : [])) {
                         if (chkHideWrapup.checked && safe(seg.segmentType) === "wrapup") continue;
                         if (!seg.segmentStart || !seg.segmentEnd) continue;
@@ -782,22 +1524,47 @@
                         rows.push({
                             kind: "segment",
                             conversationId: safe(current.conversationId),
+                            conversationStart: safe(current.conversationStart),
+                            conversationEnd: safe(current.conversationEnd),
+
                             participantPurpose: purpose,
                             participantName: pname,
                             mediaType,
                             sessionId,
-                            eventType: safe(seg.segmentType),
-                            eventTime: safe(seg.segmentStart),
-                            endTime: safe(seg.segmentEnd),
+
+                            segmentType: safe(seg.segmentType),
+                            segmentStart: safe(seg.segmentStart),
+                            segmentEnd: safe(seg.segmentEnd),
                             durationMs: String(end - start),
                             offsetMsFromStart: String(start - bounds.start),
+
                             queueId: safe(seg.queueId),
+                            queueName: safe(seg.queueName) || queue.queueName || queue.transferTargetName,
+
+                            conference: safe(seg.conference),
                             disconnectType: safe(seg.disconnectType),
-                            wrapUpCode: safe(seg.wrapUpCode)
+                            errorCode: safe(seg.errorCode),
+                            sipResponseCode: safe(seg.sipResponseCode),
+                            q850ResponseCode: safe(seg.q850ResponseCode),
+
+                            sourceConversationId: safe(seg.sourceConversationId),
+                            destinationConversationId: safe(seg.destinationConversationId),
+                            sourceSessionId: safe(seg.sourceSessionId),
+                            destinationSessionId: safe(seg.destinationSessionId),
+
+                            wrapUpCode: safe(seg.wrapUpCode),
+
+                            // Global summary fields
+                            skills_all: skillsAll.join(";"),
+                            flowName: safe(primaryFlow.flowName),
+                            flowId: safe(primaryFlow.flowId),
+                            flowType: safe(primaryFlow.flowType),
+                            flowVersion: safe(primaryFlow.flowVersion),
+                            transferTargetName: queue.transferTargetName,
+                            transferTargetAddress: queue.transferTargetAddress,
                         });
                     }
 
-                    // Metrics
                     for (const m of (Array.isArray(s?.metrics) ? s.metrics : [])) {
                         const t = m.emitDate || "";
                         if (!t) continue;
@@ -809,19 +1576,16 @@
                             participantName: pname,
                             mediaType,
                             sessionId,
-                            eventType: safe(m.name),
-                            eventTime: safe(m.emitDate),
-                            endTime: "",
-                            durationMs: "",
+                            metricName: safe(m.name),
+                            emitDate: safe(m.emitDate),
+                            value: safe(m.value),
                             offsetMsFromStart: String(dt - bounds.start),
-                            queueId: "",
-                            disconnectType: "",
-                            wrapUpCode: "",
-                            value: safe(m.value)
+                            skills_all: skillsAll.join(";"),
+                            flowName: safe(primaryFlow.flowName),
+                            transferTargetName: queue.transferTargetName,
                         });
                     }
 
-                    // Quality
                     for (const q of (Array.isArray(s?.mediaEndpointStats) ? s.mediaEndpointStats : [])) {
                         const t = q.eventTime || "";
                         if (!t) continue;
@@ -833,21 +1597,40 @@
                             participantName: pname,
                             mediaType,
                             sessionId,
-                            eventType: "mediaEndpointStats",
                             eventTime: safe(q.eventTime),
-                            endTime: "",
-                            durationMs: "",
                             offsetMsFromStart: String(dt - bounds.start),
-                            queueId: "",
-                            disconnectType: "",
-                            wrapUpCode: "",
                             minMos: safe(q.minMos),
                             minRFactor: safe(q.minRFactor),
                             maxLatencyMs: safe(q.maxLatencyMs),
-                            receivedPackets: safe(q.receivedPackets)
+                            receivedPackets: safe(q.receivedPackets),
+                            discardedPackets: safe(q.discardedPackets),
+                            skills_all: skillsAll.join(";"),
+                            flowName: safe(primaryFlow.flowName),
                         });
                     }
                 }
+            }
+
+            // Add link events as their own rows (investigation ledger)
+            for (const l of links) {
+                const when = l.whenEnd || l.whenStart || "";
+                const dt = when ? parseDto(when) : null;
+                rows.push({
+                    kind: "link",
+                    conversationId: safe(current.conversationId),
+                    when: when,
+                    offsetMsFromStart: (dt ? String(dt - bounds.start) : ""),
+                    segmentType: l.segmentType,
+                    participantPurpose: l.purpose,
+                    mediaType: l.mediaType,
+                    label: l.label,
+                    disconnectType: l.disconnectType,
+                    conference: l.conference,
+                    sourceConversationId: l.sourceConversationId,
+                    destinationConversationId: l.destinationConversationId,
+                    sourceSessionId: l.sourceSessionId,
+                    destinationSessionId: l.destinationSessionId,
+                });
             }
 
             downloadCsv(rows, `conversation_${safe(current.conversationId)}_events.csv`);

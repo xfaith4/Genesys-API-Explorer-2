@@ -1,0 +1,19 @@
+  var braintab = {
+    product: "genesys-multicloud-cx",
+    theme: "light",
+    onInit: (el) => {},
+    onLogin: () => {},
+    onToggle: () => {},
+  };
+  (function (b, r, a, i, n) {
+    var e = r.createElement("link");
+    e.rel = "stylesheet";
+    e.type = "text/css";
+    e.href = `https://assets.genesyscsdt.com/widgets/braintab-core.min.css`;
+    r.head.appendChild(e);
+    var t = r.createElement("script");
+    t.type = "text/javascript";
+    t.onload = () => braintab.init(b, r, a, i, n);
+    t.src = `https://assets.genesyscsdt.com/widgets/braintab-core.min.js`;
+    r.head.appendChild(t);
+  })(window, document, "custom-container", "gkn-brain-tab", false);

@@ -1,0 +1,151 @@
+/* 
+    Due to GDPR issues, webfonts must be localized to the application or Genesys approved service and should
+    not directly call webfonts via fonts.googleapis.com or fonts.gstatic.com.
+    Fonts can be localized for custom css and downloaded from here.
+    See https://google-webfonts-helper.herokuapp.com/fonts/roboto?subsets=latin
+*/
+
+/* Genesys Primary Branding Font - Roboto */
+/* roboto-100 - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+  src:
+    local('Roboto Thin'),
+    local('Roboto-Thin'),
+    url('/assets/fonts/roboto/Roboto-Thin.ttf') format('truetype');
+}
+
+/* roboto-100italic - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: italic;
+  font-weight: 100;
+  font-display: swap;
+  src:
+    local('Roboto Thin Italic'),
+    local('Roboto-ThinItalic'),
+    url('/assets/fonts/roboto/Roboto-ThinItalic.ttf') format('truetype');
+}
+
+/* roboto-300 - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src:
+    local('Roboto Light'),
+    local('Roboto-Light'),
+    url('/assets/fonts/roboto/Roboto-Light.ttf') format('truetype');
+}
+
+/* roboto-300italic - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: italic;
+  font-weight: 300;
+  font-display: swap;
+  src:
+    local('Roboto Light'),
+    local('Roboto-LightItalic'),
+    url('/assets/fonts/roboto/Roboto-LightItalic.ttf') format('truetype');
+}
+
+/* roboto-regular - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    local('Roboto Regular'),
+    local('Roboto-Regular'),
+    url('/assets/fonts/roboto/Roboto-Regular.ttf') format('truetype');
+}
+
+/* roboto-italic - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    local('Roboto'),
+    local('Roboto-Italic'),
+    url('/assets/fonts/roboto/Roboto-Italic.ttf') format('truetype');
+}
+
+/* roboto-500 - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src:
+    local('Roboto Medium'),
+    local('Roboto-Medium'),
+    url('/assets/fonts/roboto/Roboto-Medium.ttf') format('truetype');
+}
+
+/* roboto-500italic - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src:
+    local('Roboto Medium'),
+    local('Roboto-MediumItalic'),
+    url('/assets/fonts/roboto/Roboto-MediumItalic.ttf') format('truetype');
+}
+
+/* roboto-700 - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src:
+    local('Roboto Bold'),
+    local('Roboto-Bold'),
+    url('/assets/fonts/roboto/Roboto-Bold.ttf') format('truetype');
+}
+
+/* roboto-700italic - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src:
+    local('Roboto Bold'),
+    local('Roboto-BoldItalic'),
+    url('/assets/fonts/roboto/Roboto-BoldItalic.ttf') format('truetype');
+}
+
+/* roboto-900 - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src:
+    local('Roboto Black'),
+    local('Roboto-Black'),
+    url('/assets/fonts/roboto/Roboto-Black.ttf') format('truetype');
+}
+
+/* roboto-900italic - latin */
+@font-face {
+  font-family: 'Roboto';
+  font-style: italic;
+  font-weight: 900;
+  font-display: swap;
+  src:
+    local('Roboto Black'),
+    local('Roboto-BlackItalic'),
+    url('/assets/fonts/roboto/Roboto-BlackItalic.ttf') format('truetype');
+}
