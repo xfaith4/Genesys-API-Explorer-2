@@ -1,0 +1,16 @@
+{
+  "id": "run-24",
+  "journey": "run-report",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "mobile",
+    "Network": "wifi",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 120.69,
+  "errors": 2,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.0968011Z"
+}

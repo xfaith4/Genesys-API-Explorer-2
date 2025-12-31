@@ -1,0 +1,8 @@
+{
+  "totalRuns": 100,
+  "completionRate": 32.0,
+  "meanDurationSec": 59.64,
+  "errorRate": 67.0,
+  "rageClickRate": 54.0,
+  "stuckRate": 2.0
+}

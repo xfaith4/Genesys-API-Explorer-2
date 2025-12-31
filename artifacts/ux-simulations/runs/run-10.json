@@ -1,0 +1,16 @@
+{
+  "id": "run-10",
+  "journey": "save-favorite",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "tablet",
+    "Network": "fast4g",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 48.1,
+  "errors": 1,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.0827893Z"
+}

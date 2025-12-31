@@ -24,6 +24,24 @@ if (-not $ScriptRoot) {
 $DeveloperDocsUrl = "https://developer.genesys.cloud"
 $SupportDocsUrl = "https://help.mypurecloud.com"
 
+. "$ScriptRoot/UxTelemetry.ps1"
+$script:UxSessionId = [guid]::NewGuid().ToString()
+$telemetryRoot = [System.IO.Path]::GetFullPath((Join-Path $ScriptRoot "../../artifacts/ux-simulations"))
+Initialize-UxTelemetry -TargetPath (Get-UxTelemetryDefaultPath -RootPath $telemetryRoot) -SessionId $script:UxSessionId
+
+$script:DesignTokens = @{}
+try {
+    $designTokenPath = Join-Path -Path $ScriptRoot -ChildPath "design-tokens.psd1"
+    if (Test-Path -LiteralPath $designTokenPath) {
+        $script:DesignTokens = Import-PowerShellDataFile -LiteralPath $designTokenPath
+    }
+}
+catch {
+    # Keep defaults if tokens fail to load
+}
+$script:UxDebugBlock = $null
+$script:SubmitClickTimes = New-Object System.Collections.Generic.List[datetime]
+
 function Get-TraceLogPath {
     try {
         $base = [System.IO.Path]::GetTempPath()
@@ -6043,6 +6061,9 @@ if (-not $Window) {
     Write-Error "Failed to create the WPF UI."
     return
 }
+Set-DesignSystemResources -Window $Window
+Ensure-UxDebugHud -Window $Window
+Write-UxEvent -Name "time_to_interactive" -Properties @{ route = "home"; ready = $true }
 
 $groupCombo = $Window.FindName("GroupCombo")
 $pathCombo = $Window.FindName("PathCombo")
@@ -6174,6 +6195,16 @@ $segmentPropertyTypeCombo = $Window.FindName("SegmentPropertyTypeCombo")
 $segmentValueInput = $Window.FindName("SegmentValueInput")
 $addSegmentPredicateButton = $Window.FindName("AddSegmentPredicateButton")
 $removeSegmentPredicateButton = $Window.FindName("RemoveSegmentPredicateButton")
+
+if ($mainTabControl) {
+    $mainTabControl.Add_SelectionChanged({
+            if ($mainTabControl.SelectedItem) {
+                $route = $mainTabControl.SelectedItem.Header.ToString()
+                Write-UxEvent -Name "page_view" -Properties @{ route = $route; ts = (Get-Date).ToString('o') }
+                Update-UxDebugHud -Route $route -Status $statusText.Text -LastEvent "tab-change"
+            }
+        })
+}
 
 if ($filterBuilderBorder) {
     Initialize-FilterBuilderControl
@@ -6398,6 +6429,100 @@ function Invoke-ReloadEndpoints {
     }
 }
 
+function Set-DesignSystemResources {
+    param([System.Windows.Window]$Window)
+
+    if (-not $Window -or -not $script:DesignTokens) { return }
+
+    try {
+        $color = $script:DesignTokens.Color
+        $spacing = $script:DesignTokens.Spacing
+        $radius = $script:DesignTokens.Radius
+
+        $primaryBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.Primary))
+        $accentBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.Accent))
+        $surfaceBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.Surface))
+        $surfaceMutedBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.SurfaceMuted))
+        $borderBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.Border))
+        $textPrimary = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.TextPrimary))
+        $textSecondary = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.TextSecondary))
+
+        $Window.Resources["PrimaryBrush"] = $primaryBrush
+        $Window.Resources["AccentBrush"] = $accentBrush
+        $Window.Resources["SurfaceBrush"] = $surfaceBrush
+        $Window.Resources["SurfaceMutedBrush"] = $surfaceMutedBrush
+        $Window.Resources["BorderBrush"] = $borderBrush
+        $Window.Resources["TextPrimaryBrush"] = $textPrimary
+        $Window.Resources["TextSecondaryBrush"] = $textSecondary
+        $Window.Resources["CornerRadiusMD"] = New-Object System.Windows.CornerRadius ($radius.MD)
+        $Window.Resources["SpacingSM"] = $spacing.SM
+        $Window.Resources["SpacingMD"] = $spacing.MD
+
+        $Window.Background = $surfaceBrush
+    }
+    catch {
+        # Keep defaults if token application fails
+    }
+}
+
+function Update-UxDebugHud {
+    param(
+        [string]$Route,
+        [string]$Status,
+        [string]$LastEvent
+    )
+
+    if (-not $script:UxDebugBlock) { return }
+    $script:UxDebugBlock.Text = "Route: $Route`nStatus: $Status`nLast: $LastEvent`nSession: $script:UxSessionId"
+}
+
+function Ensure-UxDebugHud {
+    param([System.Windows.Window]$Window)
+
+    if (-not $Window) { return }
+    $debugFlag = [string]$env:GENESYS_API_EXPLORER_DEBUG_UI
+    if (-not ($debugFlag -match '^(1|true|yes)$')) { return }
+
+    $hud = New-Object System.Windows.Window
+    $hud.Width = 320
+    $hud.Height = 170
+    $hud.Topmost = $true
+    $hud.WindowStyle = 'ToolWindow'
+    $hud.ResizeMode = 'NoResize'
+    $hud.ShowInTaskbar = $false
+    $hud.Title = "UX Debug HUD"
+    $hud.Owner = $Window
+
+    $panel = New-Object System.Windows.Controls.Border
+    $panel.Padding = '10'
+    $panel.Background = $Window.Resources["SurfaceMutedBrush"]
+    $panel.BorderBrush = $Window.Resources["BorderBrush"]
+    $panel.BorderThickness = '1'
+    if ($Window.Resources["CornerRadiusMD"]) {
+        $panel.CornerRadius = $Window.Resources["CornerRadiusMD"]
+    }
+
+    $text = New-Object System.Windows.Controls.TextBlock
+    $text.Foreground = $Window.Resources["TextPrimaryBrush"]
+    $text.TextWrapping = 'Wrap'
+    $text.Text = "UX debug ready..."
+    $panel.Child = $text
+
+    $hud.Content = $panel
+    $script:UxDebugBlock = $text
+    $hud.Show()
+}
+
+function Test-RageClick {
+    param([datetime]$Now)
+
+    $script:SubmitClickTimes.Add($Now)
+    while ($script:SubmitClickTimes.Count -gt 0 -and ($Now - $script:SubmitClickTimes[0]).TotalSeconds -gt 2) {
+        $script:SubmitClickTimes.RemoveAt(0)
+    }
+    return ($script:SubmitClickTimes.Count -ge 3)
+}
+
 function Add-LogEntry {
     param ([string]$Message)
 
@@ -6406,6 +6531,7 @@ function Add-LogEntry {
         $logBox.AppendText("[$timestamp] $Message`r`n")
         $logBox.ScrollToEnd()
     }
+    Write-UxEvent -Name "log" -Properties @{ message = $Message; ts = $timestamp }
 }
 
 function Refresh-FavoritesList {
@@ -6417,6 +6543,9 @@ function Refresh-FavoritesList {
     }
 
     $favoritesList.SelectedIndex = -1
+    if ($Favorites.Count -eq 0) {
+        Write-UxEvent -Name "empty_state_seen" -Properties @{ target = "favorites"; route = "home" }
+    }
 }
 
 function Get-InsightPackPath {
@@ -8990,10 +9119,16 @@ if ($importTemplatesButton) {
 $btnSubmit.Add_Click({
         $selectedPath = $pathCombo.SelectedItem
         $selectedMethod = $methodCombo.SelectedItem
+        $now = Get-Date
+        Write-UxEvent -Name "cta_click" -Properties @{ control = "submit"; path = $selectedPath; method = $selectedMethod }
+        if (Test-RageClick -Now $now) {
+            Write-UxEvent -Name "rage_click" -Properties @{ control = "submit"; path = $selectedPath; method = $selectedMethod }
+        }
 
         if (-not $selectedPath -or -not $selectedMethod) {
             $statusText.Text = "Select a path and method first."
             Add-LogEntry "Submit blocked: method or path missing."
+            Write-UxEvent -Name "dead_click" -Properties @{ control = "submit"; reason = "missing-path-or-method" }
             return
         }
 
@@ -9072,6 +9207,7 @@ $btnSubmit.Add_Click({
             $errorMessage = "Validation errors:`n" + ($validationErrors -join "`n")
             $statusText.Text = "Validation failed: " + ($validationErrors -join ", ")
             Add-LogEntry "Submit blocked: $errorMessage"
+            Write-UxEvent -Name "validation_error" -Properties @{ errors = $validationErrors; path = $selectedPath; method = $selectedMethod }
             [System.Windows.MessageBox]::Show($errorMessage, "Validation Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning)
             return
         }
@@ -9137,6 +9273,14 @@ $btnSubmit.Add_Click({
 
         # Track request start time
         $requestStartTime = Get-Date
+        Write-UxEvent -Name "api_call_start" -Properties @{
+            method    = $selectedMethod.ToUpper()
+            path      = $selectedPath
+            url       = $fullUrl
+            timestamp = $requestStartTime.ToString('o')
+        }
+        $hudRoute = if ($mainTabControl -and $mainTabControl.SelectedItem) { $mainTabControl.SelectedItem.Header } else { "unknown" }
+        Update-UxDebugHud -Route $hudRoute -Status "Sending" -LastEvent "api_call_start"
 
         # Store parameters for history
         $requestParams = @{}
@@ -9202,6 +9346,15 @@ $btnSubmit.Add_Click({
 
             $statusText.Text = "Last call succeeded ($($response.StatusCode)) - {0:N0} ms$paginationInfo" -f $requestDuration
             Add-LogEntry ("Response: {0} returned {1} chars in {2:N0} ms.$paginationInfo" -f $response.StatusCode, $formattedContent.Length, $requestDuration)
+            Write-UxEvent -Name "api_call" -Properties @{
+                method      = $selectedMethod.ToUpper()
+                path        = $selectedPath
+                statusCode  = [int]$response.StatusCode
+                durationMs  = [math]::Round($requestDuration, 0)
+                pagination  = $hasPagination
+                timestamp   = (Get-Date).ToString('o')
+            }
+            Update-UxDebugHud -Route $hudRoute -Status ("OK " + $response.StatusCode) -LastEvent "api_success"
 
             # If pagination detected, log a note
             if ($hasPagination) {
@@ -9316,6 +9469,14 @@ $btnSubmit.Add_Click({
                 }
                 Add-LogEntry "Error response body: $logBody"
             }
+            Write-UxEvent -Name "api_error" -Properties @{
+                method     = $selectedMethod.ToUpper()
+                path       = $selectedPath
+                durationMs = [math]::Round(((Get-Date) - $requestStartTime).TotalMilliseconds, 0)
+                message    = $errorMessage
+                status     = $statusCode
+            }
+            Update-UxDebugHud -Route $hudRoute -Status "Error" -LastEvent "api_error"
         }
     })
 

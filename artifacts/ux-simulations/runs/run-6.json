@@ -1,0 +1,16 @@
+{
+  "id": "run-6",
+  "journey": "inspect-response",
+  "profile": {
+    "Skill": "novice",
+    "Viewport": "mobile",
+    "Network": "slow3g",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 25.68,
+  "errors": 0,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:06:11.0709067Z"
+}

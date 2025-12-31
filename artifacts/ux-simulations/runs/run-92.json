@@ -1,0 +1,16 @@
+{
+  "id": "run-92",
+  "journey": "onboarding",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "tablet",
+    "Network": "slow3g",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 71.31,
+  "errors": 2,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.1652701Z"
+}

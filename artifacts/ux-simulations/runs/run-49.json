@@ -1,0 +1,16 @@
+{
+  "id": "run-49",
+  "journey": "inspect-response",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "mobile",
+    "Network": "slow3g",
+    "A11yMode": "standard"
+  },
+  "durationSec": 14.8,
+  "errors": 2,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.1231243Z"
+}

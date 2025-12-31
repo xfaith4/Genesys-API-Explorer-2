@@ -1,0 +1,16 @@
+{
+  "id": "run-67",
+  "journey": "inspect-response",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "tablet",
+    "Network": "wifi",
+    "A11yMode": "standard"
+  },
+  "durationSec": 21.51,
+  "errors": 0,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:06:11.1398931Z"
+}

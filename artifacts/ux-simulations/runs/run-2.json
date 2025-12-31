@@ -1,0 +1,16 @@
+{
+  "id": "run-2",
+  "journey": "run-report",
+  "profile": {
+    "Skill": "novice",
+    "Viewport": "tablet",
+    "Network": "slow3g",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 115.09,
+  "errors": 0,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:06:11.0657334Z"
+}

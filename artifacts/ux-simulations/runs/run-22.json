@@ -1,0 +1,16 @@
+{
+  "id": "run-22",
+  "journey": "run-report",
+  "profile": {
+    "Skill": "careful",
+    "Viewport": "desktop",
+    "Network": "fast4g",
+    "A11yMode": "reduced-motion"
+  },
+  "durationSec": 60.98,
+  "errors": 1,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.0948040Z"
+}

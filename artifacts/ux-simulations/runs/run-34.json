@@ -1,0 +1,16 @@
+{
+  "id": "run-34",
+  "journey": "onboarding",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "mobile",
+    "Network": "wifi",
+    "A11yMode": "standard"
+  },
+  "durationSec": 32.87,
+  "errors": 1,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.1073087Z"
+}

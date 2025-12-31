@@ -1,0 +1,16 @@
+{
+  "id": "run-93",
+  "journey": "save-favorite",
+  "profile": {
+    "Skill": "novice",
+    "Viewport": "mobile",
+    "Network": "fast4g",
+    "A11yMode": "reduced-motion"
+  },
+  "durationSec": 87.15,
+  "errors": 1,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.1661918Z"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "run-68",
+  "journey": "onboarding",
+  "profile": {
+    "Skill": "novice",
+    "Viewport": "mobile",
+    "Network": "slow3g",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 24.8,
+  "errors": 2,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.1408146Z"
+}

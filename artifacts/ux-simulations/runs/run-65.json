@@ -1,0 +1,16 @@
+{
+  "id": "run-65",
+  "journey": "inspect-response",
+  "profile": {
+    "Skill": "careful",
+    "Viewport": "tablet",
+    "Network": "slow3g",
+    "A11yMode": "reduced-motion"
+  },
+  "durationSec": 113.94,
+  "errors": 2,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.1380308Z"
+}

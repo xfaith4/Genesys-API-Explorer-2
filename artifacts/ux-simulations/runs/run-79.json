@@ -1,0 +1,16 @@
+{
+  "id": "run-79",
+  "journey": "submit-api",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "desktop",
+    "Network": "fast4g",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 46.49,
+  "errors": 2,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.1509718Z"
+}

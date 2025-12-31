@@ -1,0 +1,16 @@
+{
+  "id": "run-35",
+  "journey": "inspect-response",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "desktop",
+    "Network": "wifi",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 74.02,
+  "errors": 0,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:06:11.1087289Z"
+}

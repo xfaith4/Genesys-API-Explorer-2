@@ -1,0 +1,16 @@
+{
+  "id": "run-4",
+  "journey": "save-favorite",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "mobile",
+    "Network": "slow3g",
+    "A11yMode": "reduced-motion"
+  },
+  "durationSec": 79.19,
+  "errors": 1,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.0684501Z"
+}

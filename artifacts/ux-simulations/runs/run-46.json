@@ -1,0 +1,16 @@
+{
+  "id": "run-46",
+  "journey": "submit-api",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "desktop",
+    "Network": "fast4g",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 40.85,
+  "errors": 2,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.1203250Z"
+}

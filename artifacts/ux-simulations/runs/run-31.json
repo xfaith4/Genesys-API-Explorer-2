@@ -1,0 +1,16 @@
+{
+  "id": "run-31",
+  "journey": "onboarding",
+  "profile": {
+    "Skill": "careful",
+    "Viewport": "tablet",
+    "Network": "fast4g",
+    "A11yMode": "reduced-motion"
+  },
+  "durationSec": 87.74,
+  "errors": 1,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.1036195Z"
+}

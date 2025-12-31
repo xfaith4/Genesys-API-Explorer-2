@@ -1,0 +1,16 @@
+{
+  "id": "run-39",
+  "journey": "inspect-response",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "desktop",
+    "Network": "fast4g",
+    "A11yMode": "standard"
+  },
+  "durationSec": 106.27,
+  "errors": 0,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:06:11.1137463Z"
+}

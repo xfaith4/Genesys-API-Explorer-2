@@ -1,0 +1,16 @@
+{
+  "id": "run-13",
+  "journey": "submit-api",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "tablet",
+    "Network": "slow3g",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 59.61,
+  "errors": 1,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:06:11.0857627Z"
+}
