@@ -95,6 +95,91 @@ function Write-TraceLog {
     catch { }
 }
 
+function Set-DesignSystemResources {
+    param([System.Windows.Window]$Window)
+
+    if (-not $Window -or -not $script:DesignTokens) { return }
+
+    try {
+        $color = $script:DesignTokens.Color
+        $spacing = $script:DesignTokens.Spacing
+        $radius = $script:DesignTokens.Radius
+
+        $primaryBrush = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.ColorConverter]::ConvertFromString([string]$color.Primary))
+        $accentBrush = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.ColorConverter]::ConvertFromString([string]$color.Accent))
+        $surfaceBrush = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.ColorConverter]::ConvertFromString([string]$color.Surface))
+        $surfaceMutedBrush = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.ColorConverter]::ConvertFromString([string]$color.SurfaceMuted))
+        $borderBrush = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.ColorConverter]::ConvertFromString([string]$color.Border))
+        $textPrimary = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.ColorConverter]::ConvertFromString([string]$color.TextPrimary))
+        $textSecondary = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.ColorConverter]::ConvertFromString([string]$color.TextSecondary))
+
+        $Window.Resources["PrimaryBrush"] = [System.Windows.Media.Brush]$primaryBrush
+        $Window.Resources["AccentBrush"] = [System.Windows.Media.Brush]$accentBrush
+        $Window.Resources["SurfaceBrush"] = [System.Windows.Media.Brush]$surfaceBrush
+        $Window.Resources["SurfaceMutedBrush"] = [System.Windows.Media.Brush]$surfaceMutedBrush
+        $Window.Resources["BorderBrush"] = [System.Windows.Media.Brush]$borderBrush
+        $Window.Resources["TextPrimaryBrush"] = [System.Windows.Media.Brush]$textPrimary
+        $Window.Resources["TextSecondaryBrush"] = [System.Windows.Media.Brush]$textSecondary
+        $Window.Resources["CornerRadiusMD"] = New-Object System.Windows.CornerRadius ($radius.MD)
+        $Window.Resources["SpacingSM"] = $spacing.SM
+        $Window.Resources["SpacingMD"] = $spacing.MD
+
+        $Window.Background = [System.Windows.Media.Brush]$surfaceBrush
+    }
+    catch {
+        # Keep defaults if token application fails
+    }
+}
+
+function Update-UxDebugHud {
+    param(
+        [string]$Route,
+        [string]$Status,
+        [string]$LastEvent
+    )
+
+    if (-not $script:UxDebugBlock) { return }
+    $script:UxDebugBlock.Text = "Route: $Route`nStatus: $Status`nLast: $LastEvent`nSession: $script:UxSessionId"
+}
+
+function Ensure-UxDebugHud {
+    param([System.Windows.Window]$Window)
+
+    if (-not $Window) { return }
+    $debugFlag = [string]$env:GENESYS_API_EXPLORER_DEBUG_UI
+    if (-not ($debugFlag -match '^(1|true|yes)$')) { return }
+
+    $hud = New-Object System.Windows.Window
+    $hud.Width = 320
+    $hud.Height = 170
+    $hud.Topmost = $true
+    $hud.WindowStyle = 'ToolWindow'
+    $hud.ResizeMode = 'NoResize'
+    $hud.ShowInTaskbar = $false
+    $hud.Title = "UX Debug HUD"
+    $hud.Owner = $Window
+
+    $panel = New-Object System.Windows.Controls.Border
+    $panel.Padding = '10'
+    $panel.Background = $Window.Resources["SurfaceMutedBrush"]
+    $panel.BorderBrush = $Window.Resources["BorderBrush"]
+    $panel.BorderThickness = '1'
+    if ($Window.Resources["CornerRadiusMD"]) {
+        $panel.CornerRadius = $Window.Resources["CornerRadiusMD"]
+    }
+
+    $text = New-Object System.Windows.Controls.TextBlock
+    $text.Foreground = $Window.Resources["TextPrimaryBrush"]
+    $text.TextWrapping = 'Wrap'
+    $text.Text = "UX debug ready..."
+    $panel.Child = $text
+
+    $hud.Content = $panel
+    $script:UxDebugBlock = $text
+    $script:UxDebugWindow = $hud
+    $hud.Show()
+}
+
 function Open-Url {
     param ([string]$Url)
 
@@ -5476,6 +5561,29 @@ $Xaml = @"
         Title="Genesys Cloud API Explorer" Height="860" Width="1000"
         MinHeight="600" MinWidth="800"
         WindowStartupLocation="CenterScreen">
+  <Window.Resources>
+    <Style TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style TargetType="Label">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style TargetType="GroupBox">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style TargetType="Expander">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style TargetType="TabItem">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style TargetType="MenuItem">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+  </Window.Resources>
   <DockPanel LastChildFill="True">
 	    <Menu DockPanel.Dock="Top">
 	      <MenuItem Header="_Settings">
@@ -5807,6 +5915,10 @@ $Xaml = @"
                 </WrapPanel>
 
                 <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0 8 0 8">
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                  </Grid.RowDefinitions>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="2*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -5814,26 +5926,34 @@ $Xaml = @"
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
-                  <StackPanel Grid.Column="0" Orientation="Vertical">
+                  <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="5" Orientation="Vertical">
                     <TextBlock Name="InsightPackDescriptionText"
                                Text="Select a pack to view parameters." TextWrapping="Wrap" Foreground="Gray" />
-                    <StackPanel Orientation="Horizontal" Margin="0 6 0 0">
+                    <WrapPanel Margin="0 6 0 0" VerticalAlignment="Center">
                       <TextBlock Text="Window" VerticalAlignment="Center" Foreground="SlateGray" Margin="0 0 8 0"/>
                       <ComboBox Name="InsightTimePresetCombo" Width="260" Height="26" VerticalContentAlignment="Center"
                                 ToolTip="Quick time window presets (UTC)"/>
-                      <Button Name="ApplyInsightTimePresetButton" Width="110" Height="26" Content="Apply" Margin="10 0 0 0"/>
-                      <TextBlock Text="Example" VerticalAlignment="Center" Foreground="SlateGray" Margin="16 0 8 0"/>
+                      <Button Name="ApplyInsightTimePresetButton" Width="110" Height="26" Content="Apply" Margin="10 0 10 0"/>
+                      <TextBlock Text="Example" VerticalAlignment="Center" Foreground="SlateGray" Margin="0 0 8 0"/>
                       <ComboBox Name="InsightPackExampleCombo" Width="260" Height="26" VerticalContentAlignment="Center"
                                 ToolTip="Pack-provided example parameter presets"/>
                       <Button Name="LoadInsightPackExampleButton" Width="110" Height="26" Content="Load" Margin="10 0 0 0"/>
-                    </StackPanel>
+                    </WrapPanel>
                   </StackPanel>
-                  <TextBlock Grid.Column="1" Text="Start (UTC)" VerticalAlignment="Center" Margin="12 0 8 0" Foreground="SlateGray"/>
-                  <TextBox Grid.Column="2" Name="InsightGlobalStartInput" Width="220" Height="26" VerticalContentAlignment="Center"
-                           ToolTip="Default startDate for packs that define startDate (ISO-8601 UTC)"/>
-                  <TextBlock Grid.Column="3" Text="End (UTC)" VerticalAlignment="Center" Margin="12 0 8 0" Foreground="SlateGray"/>
-                  <TextBox Grid.Column="4" Name="InsightGlobalEndInput" Width="220" Height="26" VerticalContentAlignment="Center"
-                           ToolTip="Default endDate for packs that define endDate (ISO-8601 UTC)"/>
+                  <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="5" Margin="0 6 0 0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Start (UTC)" VerticalAlignment="Center" Margin="0 0 8 0" Foreground="SlateGray"/>
+                    <TextBox Grid.Column="1" Name="InsightGlobalStartInput" Width="220" Height="26" VerticalContentAlignment="Center"
+                             ToolTip="Default startDate for packs that define startDate (ISO-8601 UTC)"/>
+                    <TextBlock Grid.Column="2" Text="End (UTC)" VerticalAlignment="Center" Margin="12 0 8 0" Foreground="SlateGray"/>
+                    <TextBox Grid.Column="3" Name="InsightGlobalEndInput" Width="220" Height="26" VerticalContentAlignment="Center"
+                             ToolTip="Default endDate for packs that define endDate (ISO-8601 UTC)"/>
+                  </Grid>
                 </Grid>
                 <Expander Grid.Row="2" Grid.ColumnSpan="2" Header="Pack Metadata" IsExpanded="False" Margin="0 0 0 8">
                   <Border BorderBrush="#D0D7E2" BorderThickness="1" CornerRadius="6" Padding="10" Background="White">
@@ -6464,91 +6584,6 @@ function Invoke-ReloadEndpoints {
         Add-LogEntry "Error reloading endpoints: $($_.Exception.Message)"
         return $false
     }
-}
-
-function Set-DesignSystemResources {
-    param([System.Windows.Window]$Window)
-
-    if (-not $Window -or -not $script:DesignTokens) { return }
-
-    try {
-        $color = $script:DesignTokens.Color
-        $spacing = $script:DesignTokens.Spacing
-        $radius = $script:DesignTokens.Radius
-
-        $primaryBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.Primary))
-        $accentBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.Accent))
-        $surfaceBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.Surface))
-        $surfaceMutedBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.SurfaceMuted))
-        $borderBrush = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.Border))
-        $textPrimary = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.TextPrimary))
-        $textSecondary = New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($color.TextSecondary))
-
-        $Window.Resources["PrimaryBrush"] = $primaryBrush
-        $Window.Resources["AccentBrush"] = $accentBrush
-        $Window.Resources["SurfaceBrush"] = $surfaceBrush
-        $Window.Resources["SurfaceMutedBrush"] = $surfaceMutedBrush
-        $Window.Resources["BorderBrush"] = $borderBrush
-        $Window.Resources["TextPrimaryBrush"] = $textPrimary
-        $Window.Resources["TextSecondaryBrush"] = $textSecondary
-        $Window.Resources["CornerRadiusMD"] = New-Object System.Windows.CornerRadius ($radius.MD)
-        $Window.Resources["SpacingSM"] = $spacing.SM
-        $Window.Resources["SpacingMD"] = $spacing.MD
-
-        $Window.Background = $surfaceBrush
-    }
-    catch {
-        # Keep defaults if token application fails
-    }
-}
-
-function Update-UxDebugHud {
-    param(
-        [string]$Route,
-        [string]$Status,
-        [string]$LastEvent
-    )
-
-    if (-not $script:UxDebugBlock) { return }
-    $script:UxDebugBlock.Text = "Route: $Route`nStatus: $Status`nLast: $LastEvent`nSession: $script:UxSessionId"
-}
-
-function Ensure-UxDebugHud {
-    param([System.Windows.Window]$Window)
-
-    if (-not $Window) { return }
-    $debugFlag = [string]$env:GENESYS_API_EXPLORER_DEBUG_UI
-    if (-not ($debugFlag -match '^(1|true|yes)$')) { return }
-
-    $hud = New-Object System.Windows.Window
-    $hud.Width = 320
-    $hud.Height = 170
-    $hud.Topmost = $true
-    $hud.WindowStyle = 'ToolWindow'
-    $hud.ResizeMode = 'NoResize'
-    $hud.ShowInTaskbar = $false
-    $hud.Title = "UX Debug HUD"
-    $hud.Owner = $Window
-
-    $panel = New-Object System.Windows.Controls.Border
-    $panel.Padding = '10'
-    $panel.Background = $Window.Resources["SurfaceMutedBrush"]
-    $panel.BorderBrush = $Window.Resources["BorderBrush"]
-    $panel.BorderThickness = '1'
-    if ($Window.Resources["CornerRadiusMD"]) {
-        $panel.CornerRadius = $Window.Resources["CornerRadiusMD"]
-    }
-
-    $text = New-Object System.Windows.Controls.TextBlock
-    $text.Foreground = $Window.Resources["TextPrimaryBrush"]
-    $text.TextWrapping = 'Wrap'
-    $text.Text = "UX debug ready..."
-    $panel.Child = $text
-
-    $hud.Content = $panel
-    $script:UxDebugBlock = $text
-    $script:UxDebugWindow = $hud
-    $hud.Show()
 }
 
 function Test-RageClick {
