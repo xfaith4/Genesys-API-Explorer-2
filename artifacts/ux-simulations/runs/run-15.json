@@ -1,0 +1,16 @@
+{
+  "id": "run-15",
+  "journey": "run-report",
+  "profile": {
+    "Skill": "novice",
+    "Viewport": "mobile",
+    "Network": "fast4g",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 65.13,
+  "errors": 1,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6043444Z"
+}

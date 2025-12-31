@@ -1,0 +1,16 @@
+{
+  "id": "run-65",
+  "journey": "onboarding",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "mobile",
+    "Network": "fast4g",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 40.94,
+  "errors": 0,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6516408Z"
+}

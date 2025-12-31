@@ -1,0 +1,16 @@
+{
+  "id": "run-45",
+  "journey": "onboarding",
+  "profile": {
+    "Skill": "novice",
+    "Viewport": "mobile",
+    "Network": "fast4g",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 35.65,
+  "errors": 0,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6346173Z"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "run-93",
+  "journey": "run-report",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "mobile",
+    "Network": "slow3g",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 11.71,
+  "errors": 1,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6774144Z"
+}

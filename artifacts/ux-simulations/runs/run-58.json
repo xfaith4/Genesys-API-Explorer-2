@@ -1,0 +1,16 @@
+{
+  "id": "run-58",
+  "journey": "onboarding",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "desktop",
+    "Network": "slow3g",
+    "A11yMode": "standard"
+  },
+  "durationSec": 93.5,
+  "errors": 2,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6456966Z"
+}

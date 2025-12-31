@@ -1,0 +1,16 @@
+{
+  "id": "run-59",
+  "journey": "submit-api",
+  "profile": {
+    "Skill": "careful",
+    "Viewport": "mobile",
+    "Network": "slow3g",
+    "A11yMode": "standard"
+  },
+  "durationSec": 114.49,
+  "errors": 2,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6465415Z"
+}

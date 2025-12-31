@@ -1,0 +1,16 @@
+{
+  "id": "run-50",
+  "journey": "submit-api",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "desktop",
+    "Network": "slow3g",
+    "A11yMode": "standard"
+  },
+  "durationSec": 65.93,
+  "errors": 2,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6389424Z"
+}

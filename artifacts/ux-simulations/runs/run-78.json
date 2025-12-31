@@ -1,0 +1,16 @@
+{
+  "id": "run-78",
+  "journey": "submit-api",
+  "profile": {
+    "Skill": "careful",
+    "Viewport": "mobile",
+    "Network": "fast4g",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 74.89,
+  "errors": 1,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6625720Z"
+}

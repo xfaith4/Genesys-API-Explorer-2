@@ -1,0 +1,16 @@
+{
+  "id": "run-4",
+  "journey": "inspect-response",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "tablet",
+    "Network": "fast4g",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 78.5,
+  "errors": 2,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.5858689Z"
+}

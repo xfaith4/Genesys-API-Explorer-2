@@ -1,0 +1,16 @@
+{
+  "id": "run-23",
+  "journey": "save-favorite",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "mobile",
+    "Network": "fast4g",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 28.34,
+  "errors": 0,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6119548Z"
+}

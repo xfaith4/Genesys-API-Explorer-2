@@ -1,0 +1,16 @@
+{
+  "id": "run-37",
+  "journey": "save-favorite",
+  "profile": {
+    "Skill": "novice",
+    "Viewport": "desktop",
+    "Network": "wifi",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 13.12,
+  "errors": 0,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6269560Z"
+}

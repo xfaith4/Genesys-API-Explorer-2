@@ -1,0 +1,16 @@
+{
+  "id": "run-39",
+  "journey": "run-report",
+  "profile": {
+    "Skill": "careful",
+    "Viewport": "mobile",
+    "Network": "wifi",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 112.16,
+  "errors": 0,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6292971Z"
+}

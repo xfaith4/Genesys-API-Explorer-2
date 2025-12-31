@@ -1,0 +1,16 @@
+{
+  "id": "run-31",
+  "journey": "submit-api",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "mobile",
+    "Network": "wifi",
+    "A11yMode": "high-contrast"
+  },
+  "durationSec": 69.85,
+  "errors": 1,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6194856Z"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "run-88",
+  "journey": "submit-api",
+  "profile": {
+    "Skill": "careful",
+    "Viewport": "desktop",
+    "Network": "wifi",
+    "A11yMode": "keyboard-only"
+  },
+  "durationSec": 48.48,
+  "errors": 2,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6732057Z"
+}

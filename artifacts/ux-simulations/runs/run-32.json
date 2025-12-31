@@ -1,0 +1,16 @@
+{
+  "id": "run-32",
+  "journey": "run-report",
+  "profile": {
+    "Skill": "impatient",
+    "Viewport": "tablet",
+    "Network": "fast4g",
+    "A11yMode": "reduced-motion"
+  },
+  "durationSec": 90.27,
+  "errors": 0,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6204298Z"
+}

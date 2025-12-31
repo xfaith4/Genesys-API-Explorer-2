@@ -1,0 +1,16 @@
+{
+  "id": "run-46",
+  "journey": "inspect-response",
+  "profile": {
+    "Skill": "power",
+    "Viewport": "desktop",
+    "Network": "slow3g",
+    "A11yMode": "standard"
+  },
+  "durationSec": 98.58,
+  "errors": 1,
+  "rageClicks": 1,
+  "stuck": false,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6354900Z"
+}
