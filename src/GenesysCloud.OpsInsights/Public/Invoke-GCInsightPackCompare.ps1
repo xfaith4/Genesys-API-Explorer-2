@@ -20,7 +20,16 @@ function Invoke-GCInsightPackCompare {
         [string]$BaselineMode = 'PreviousWindow',
 
         [Parameter()]
-        [int]$BaselineShiftDays = 7
+        [int]$BaselineShiftDays = 7,
+
+        [Parameter()]
+        [string]$BaseUri,
+
+        [Parameter()]
+        [string]$AccessToken,
+
+        [Parameter()]
+        [scriptblock]$TokenProvider
     )
 
     if ($null -eq $Parameters) { $Parameters = @{} }
@@ -57,8 +66,18 @@ function Invoke-GCInsightPackCompare {
         }
     }
 
-    $current = Invoke-GCInsightPack -PackPath $PackPath -Parameters $Parameters -StrictValidation:$StrictValidation
-    $baseline = Invoke-GCInsightPack -PackPath $PackPath -Parameters $BaselineParameters -StrictValidation:$StrictValidation
+    $invokePackSplat = @{
+        PackPath          = $PackPath
+        Parameters        = $Parameters
+        StrictValidation  = $StrictValidation
+    }
+    if ($PSBoundParameters.ContainsKey('BaseUri')) { $invokePackSplat.BaseUri = $BaseUri }
+    if ($PSBoundParameters.ContainsKey('AccessToken')) { $invokePackSplat.AccessToken = $AccessToken }
+    if ($PSBoundParameters.ContainsKey('TokenProvider')) { $invokePackSplat.TokenProvider = $TokenProvider }
+
+    $current = Invoke-GCInsightPack @invokePackSplat
+    $invokePackSplat.Parameters = $BaselineParameters
+    $baseline = Invoke-GCInsightPack @invokePackSplat
 
     $metricComparisons = Compare-GCInsightMetrics -CurrentResult $current -BaselineResult $baseline
 

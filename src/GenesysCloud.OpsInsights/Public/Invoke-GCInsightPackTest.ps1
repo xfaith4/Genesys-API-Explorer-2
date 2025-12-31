@@ -21,7 +21,16 @@ function Invoke-GCInsightPackTest {
         [hashtable]$Parameters,
 
         [Parameter()]
-        [switch]$Strict
+        [switch]$Strict,
+
+        [Parameter()]
+        [string]$BaseUri,
+
+        [Parameter()]
+        [string]$AccessToken,
+
+        [Parameter()]
+        [scriptblock]$TokenProvider
     )
 
     if (-not (Test-Path -LiteralPath $PackPath)) {
@@ -84,7 +93,15 @@ function Invoke-GCInsightPackTest {
     $originalInvoker = $script:GCInvoker
     try {
         Set-GCInvoker -Invoker $invoker
-        $result = Invoke-GCInsightPack -PackPath $PackPath -Parameters $Parameters
+        $packSplat = @{
+            PackPath   = $PackPath
+            Parameters = $Parameters
+        }
+        if ($PSBoundParameters.ContainsKey('BaseUri')) { $packSplat.BaseUri = $BaseUri }
+        if ($PSBoundParameters.ContainsKey('AccessToken')) { $packSplat.AccessToken = $AccessToken }
+        if ($PSBoundParameters.ContainsKey('TokenProvider')) { $packSplat.TokenProvider = $TokenProvider }
+
+        $result = Invoke-GCInsightPack @packSplat
 
         return [pscustomobject]@{
             PackPath          = $PackPath

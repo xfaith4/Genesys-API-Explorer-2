@@ -16,6 +16,15 @@ function Invoke-GCInsightPack {
         [switch]$DryRun,
 
         [Parameter()]
+        [string]$BaseUri,
+
+        [Parameter()]
+        [string]$AccessToken,
+
+        [Parameter()]
+        [scriptblock]$TokenProvider,
+
+        [Parameter()]
         [switch]$UseCache,
 
         [Parameter()]
@@ -31,58 +40,127 @@ function Invoke-GCInsightPack {
         throw "Insight pack not found: $PackPath"
     }
 
-    if ($null -eq $Parameters) { $Parameters = @{} }
+    $effectiveBaseUri = $BaseUri
+    $effectiveAccessToken = $AccessToken
+    $effectiveTokenProvider = $TokenProvider
+    $contextWasOverridden = $false
+    $previousContext = $null
 
-	    $packJson = Get-Content -LiteralPath $resolvedPackPath -Raw
-	    if ($StrictValidation) {
-	        Test-GCInsightPackSchema -Json $packJson | Out-Null
-	    }
-	    $pack = $packJson | ConvertFrom-Json
-
-    Test-GCInsightPackDefinition -Pack $pack -Strict:$StrictValidation | Out-Null
-    $resolvedParameters = Get-GCInsightPackParameters -Pack $pack -Overrides $Parameters
-
-    $ctx = [pscustomobject]@{
-        Pack       = $pack
-        Parameters = $resolvedParameters
-        Data       = [ordered]@{}
-        Metrics    = New-Object System.Collections.ArrayList
-        Drilldowns = New-Object System.Collections.ArrayList
-        Steps      = New-Object System.Collections.ArrayList
-        GeneratedUtc = (Get-Date).ToUniversalTime()
+    if (-not $effectiveBaseUri -and $script:GCContext) {
+        if ($script:GCContext.PSObject.Properties.Name -contains 'ApiBaseUri' -and $script:GCContext.ApiBaseUri) {
+            $effectiveBaseUri = $script:GCContext.ApiBaseUri
+        }
+        elseif ($script:GCContext.PSObject.Properties.Name -contains 'BaseUri' -and $script:GCContext.BaseUri) {
+            $effectiveBaseUri = $script:GCContext.BaseUri
+        }
+    }
+    if (-not $effectiveAccessToken -and $script:GCContext -and ($script:GCContext.PSObject.Properties.Name -contains 'AccessToken')) {
+        $effectiveAccessToken = $script:GCContext.AccessToken
+    }
+    if (-not $effectiveAccessToken -and $global:AccessToken) {
+        $effectiveAccessToken = $global:AccessToken
+    }
+    if (-not $effectiveTokenProvider -and $script:GCContext -and ($script:GCContext.PSObject.Properties.Name -contains 'TokenProvider')) {
+        $effectiveTokenProvider = $script:GCContext.TokenProvider
     }
 
-	    $effectiveCacheRootDir = $null
-	    $effectiveRequestCacheDir = $null
-	    $effectivePackCacheDir = $null
-	    if ($UseCache -and (-not $DryRun)) {
-	        $effectiveCacheRootDir = if ($CacheDirectory) { $CacheDirectory } else { Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath 'GenesysCloud.OpsInsights.Cache' }
-	        $effectiveRequestCacheDir = Join-Path -Path $effectiveCacheRootDir -ChildPath 'requests'
-	        $effectivePackCacheDir = Join-Path -Path $effectiveCacheRootDir -ChildPath 'packs'
+    if ($PSBoundParameters.ContainsKey('BaseUri') -or $PSBoundParameters.ContainsKey('AccessToken') -or $PSBoundParameters.ContainsKey('TokenProvider')) {
+        $previousContext = $script:GCContext
+        $contextWasOverridden = $true
 
-	        foreach ($dir in @($effectiveCacheRootDir, $effectiveRequestCacheDir, $effectivePackCacheDir)) {
-	            if (-not (Test-Path -LiteralPath $dir)) {
-	                New-Item -ItemType Directory -Path $dir -Force | Out-Null
-	            }
-	        }
-	    }
+        $regionDomain = $null
+        if ($script:GCContext -and ($script:GCContext.PSObject.Properties.Name -contains 'RegionDomain') -and $script:GCContext.RegionDomain) {
+            $regionDomain = $script:GCContext.RegionDomain
+        }
+        if (-not $regionDomain -and $effectiveBaseUri) {
+            try {
+                $uri = [uri]$effectiveBaseUri
+                if ($uri.Host -match '^api\.(.+)$') {
+                    $regionDomain = $Matches[1]
+                }
+            }
+            catch { }
+        }
 
-    function Get-CacheKeyHex {
-        param([Parameter(Mandatory)][string]$Value)
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
-        $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
-        return ([System.BitConverter]::ToString($hash) -replace '-', '').ToLowerInvariant()
+        Set-GCContext -RegionDomain (if ($regionDomain) { $regionDomain } else { 'usw2.pure.cloud' }) -ApiBaseUri $effectiveBaseUri -AccessToken $effectiveAccessToken -TokenProvider $effectiveTokenProvider | Out-Null
     }
 
-    function Invoke-GCInsightCachedRequest {
-        param(
-            [Parameter(Mandatory)][string]$StepId,
-            [Parameter(Mandatory)][string]$Method,
-            [Parameter()][string]$PathWithQuery,
-            [Parameter()][string]$Uri,
-            [Parameter()][hashtable]$Headers,
-            [Parameter()][object]$Body
-        )
+    if ($script:GCContext) {
+        if (-not $effectiveBaseUri -and ($script:GCContext.PSObject.Properties.Name -contains 'ApiBaseUri') -and $script:GCContext.ApiBaseUri) {
+            $effectiveBaseUri = $script:GCContext.ApiBaseUri
+        }
+        if (-not $effectiveBaseUri -and ($script:GCContext.PSObject.Properties.Name -contains 'BaseUri') -and $script:GCContext.BaseUri) {
+            $effectiveBaseUri = $script:GCContext.BaseUri
+        }
+        if (-not $effectiveAccessToken -and ($script:GCContext.PSObject.Properties.Name -contains 'AccessToken')) {
+            $effectiveAccessToken = $script:GCContext.AccessToken
+        }
+        if (-not $effectiveTokenProvider -and ($script:GCContext.PSObject.Properties.Name -contains 'TokenProvider')) {
+            $effectiveTokenProvider = $script:GCContext.TokenProvider
+        }
+    }
+
+    $baseSignature = ''
+    if ($effectiveBaseUri) {
+        try {
+            $baseSignature = ([uri]$effectiveBaseUri).GetLeftPart('Authority').TrimEnd('/').ToLowerInvariant()
+        }
+        catch { $baseSignature = $effectiveBaseUri.TrimEnd('/').ToLowerInvariant() }
+    }
+
+    try {
+        if ($null -eq $Parameters) { $Parameters = @{} }
+
+		    $packJson = Get-Content -LiteralPath $resolvedPackPath -Raw
+		    if ($StrictValidation) {
+		        Test-GCInsightPackSchema -Json $packJson | Out-Null
+		    }
+		    $pack = $packJson | ConvertFrom-Json
+
+        Test-GCInsightPackDefinition -Pack $pack -Strict:$StrictValidation | Out-Null
+        $resolvedParameters = Get-GCInsightPackParameters -Pack $pack -Overrides $Parameters
+
+        $ctx = [pscustomobject]@{
+            Pack       = $pack
+            Parameters = $resolvedParameters
+            Data       = [ordered]@{}
+            Metrics    = New-Object System.Collections.ArrayList
+            Drilldowns = New-Object System.Collections.ArrayList
+            Steps      = New-Object System.Collections.ArrayList
+            GeneratedUtc = (Get-Date).ToUniversalTime()
+        }
+
+		    $effectiveCacheRootDir = $null
+		    $effectiveRequestCacheDir = $null
+		    $effectivePackCacheDir = $null
+		    if ($UseCache -and (-not $DryRun)) {
+		        $effectiveCacheRootDir = if ($CacheDirectory) { $CacheDirectory } else { Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath 'GenesysCloud.OpsInsights.Cache' }
+		        $effectiveRequestCacheDir = Join-Path -Path $effectiveCacheRootDir -ChildPath 'requests'
+		        $effectivePackCacheDir = Join-Path -Path $effectiveCacheRootDir -ChildPath 'packs'
+
+		        foreach ($dir in @($effectiveCacheRootDir, $effectiveRequestCacheDir, $effectivePackCacheDir)) {
+		            if (-not (Test-Path -LiteralPath $dir)) {
+		                New-Item -ItemType Directory -Path $dir -Force | Out-Null
+		            }
+		        }
+		    }
+
+        function Get-CacheKeyHex {
+            param([Parameter(Mandatory)][string]$Value)
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+            $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
+            return ([System.BitConverter]::ToString($hash) -replace '-', '').ToLowerInvariant()
+        }
+
+        function Invoke-GCInsightCachedRequest {
+            param(
+                [Parameter(Mandatory)][string]$StepId,
+                [Parameter(Mandatory)][string]$Method,
+                [Parameter()][string]$PathWithQuery,
+                [Parameter()][string]$Uri,
+                [Parameter()][hashtable]$Headers,
+                [Parameter()][object]$Body
+            )
 
 		        $cacheHit = $false
 		        $cachePath = $null
@@ -91,7 +169,7 @@ function Invoke-GCInsightPack {
 		            $bodyJson = if ($Body) { ($Body | ConvertTo-Json -Depth 50) } else { '' }
 		            $pathPart = if ($null -ne $PathWithQuery) { [string]$PathWithQuery } else { '' }
 		            $uriPart = if ($null -ne $Uri) { [string]$Uri } else { '' }
-		            $keyValue = "{0}|{1}|{2}|{3}|{4}|{5}" -f $pack.id, $StepId, $Method, $pathPart, $uriPart, $bodyJson
+		            $keyValue = "{0}|{1}|{2}|{3}|{4}|{5}|{6}" -f $pack.id, $StepId, $Method, $pathPart, $uriPart, $bodyJson, $baseSignature
 		            $cacheKey = Get-CacheKeyHex -Value $keyValue
 		            $cachePath = Join-Path -Path $effectiveRequestCacheDir -ChildPath ("{0}.json" -f $cacheKey)
 		            $legacyCachePath = if ($effectiveCacheRootDir) { Join-Path -Path $effectiveCacheRootDir -ChildPath ("{0}.json" -f $cacheKey) } else { $null }
@@ -122,6 +200,8 @@ function Invoke-GCInsightPack {
         if ($Uri) { $splat.Uri = $Uri }
         elseif ($PathWithQuery) { $splat.Path = $PathWithQuery }
         else { throw "Invoke-GCInsightCachedRequest requires Uri or PathWithQuery." }
+        if ($effectiveBaseUri) { $splat.BaseUri = $effectiveBaseUri }
+        if ($effectiveAccessToken) { $splat.AccessToken = $effectiveAccessToken }
         if ($Body) { $splat.Body = $Body }
 
 	        $response = Invoke-GCRequest @splat
@@ -185,14 +265,14 @@ function Invoke-GCInsightPack {
                     }
                     else {
                         $cacheResult = Invoke-GCInsightCachedRequest -StepId $step.id -Method $method -PathWithQuery ($requestSplat.Path) -Uri ($requestSplat.Uri) -Headers $headers -Body $body
-                        $ctx.Data[$step.id] = $cacheResult.Value
-                        if ($cacheResult.CacheHit) {
-                            $log.ResultSummary = "CACHE HIT: HTTP $method → $pathWithQuery"
-                        }
-                        else {
-                            $log.ResultSummary = "HTTP $method → $pathWithQuery (received status: $($cacheResult.Value.statusCode -or 'OK'))"
-                        }
-                    }
+	        $ctx.Data[$step.id] = $cacheResult.Value
+	        if ($cacheResult.CacheHit) {
+	            $log.ResultSummary = "CACHE HIT: HTTP $method → $pathWithQuery"
+	        }
+	        else {
+	            $log.ResultSummary = "HTTP $method → $pathWithQuery (received status: $($cacheResult.Value.statusCode -or 'OK'))"
+	        }
+	    }
                 }
 
                 'compute' {
@@ -314,6 +394,8 @@ function Invoke-GCInsightPack {
                     }
                     else {
                         $createSplat = @{ Method = $createMethod; Headers = $createHeaders }
+                        if ($effectiveBaseUri) { $createSplat.BaseUri = $effectiveBaseUri }
+                        if ($effectiveAccessToken) { $createSplat.AccessToken = $effectiveAccessToken }
                         if ($createPath -match '^https?://') { $createSplat.Uri = $createPath } else { $createSplat.Path = $createPath }
                         if ($createBody) { $createSplat.Body = $createBody }
 
@@ -321,13 +403,13 @@ function Invoke-GCInsightPack {
                         $jobId = $job.id
                         if ([string]::IsNullOrWhiteSpace([string]$jobId)) { throw "JobPoll step '$($step.id)' did not receive a job id." }
 
-                        $statusPath = Resolve-GCInsightTemplateString -Template $statusPathTemplate -Parameters (@{ jobId = $jobId })
-                        $deadline = (Get-Date).AddSeconds($maxWaitSec)
-                        $state = $null
-                        while ($true) {
-                            if ((Get-Date) -gt $deadline) { throw "JobPoll step '$($step.id)' timed out after ${maxWaitSec}s waiting for job $jobId." }
-                            Start-Sleep -Seconds $pollIntervalSec
-	                            $status = Invoke-GCRequest -Method GET -Path $statusPath
+                            $statusPath = Resolve-GCInsightTemplateString -Template $statusPathTemplate -Parameters (@{ jobId = $jobId })
+                            $deadline = (Get-Date).AddSeconds($maxWaitSec)
+                            $state = $null
+                            while ($true) {
+                                if ((Get-Date) -gt $deadline) { throw "JobPoll step '$($step.id)' timed out after ${maxWaitSec}s waiting for job $jobId." }
+                                Start-Sleep -Seconds $pollIntervalSec
+	                            $status = Invoke-GCRequest -Method GET -Path $statusPath -BaseUri $effectiveBaseUri -AccessToken $effectiveAccessToken
 	                            $stateValue = ''
 	                            if ($status) {
 	                                if (($status.PSObject.Properties.Name -contains 'state') -and $status.state) { $stateValue = $status.state }
@@ -350,7 +432,7 @@ function Invoke-GCInsightPack {
                             if ($cursor) {
                                 $path = $path + "?cursor=" + [System.Uri]::EscapeDataString([string]$cursor)
                             }
-                            $page = Invoke-GCRequest -Method GET -Path $path
+                            $page = Invoke-GCRequest -Method GET -Path $path -BaseUri $effectiveBaseUri -AccessToken $effectiveAccessToken
 
                             $batch = @()
                             if ($page -and ($page.PSObject.Properties.Name -contains $resultsItemField)) {
@@ -394,7 +476,7 @@ function Invoke-GCInsightPack {
 	                    $keyTemplate = if ($step.keyTemplate) { [string]$step.keyTemplate } else { '' }
 	                    $keyMaterial = if ($keyTemplate) { Resolve-GCInsightTemplateString -Template $keyTemplate -Parameters $ctx.Parameters } else { '' }
 	                    $paramsJson = ($ctx.Parameters | ConvertTo-Json -Depth 30)
-	                    $keyValue = "{0}|{1}|{2}|{3}|{4}" -f $pack.id, $pack.version, $step.id, $keyMaterial, $paramsJson
+	                    $keyValue = "{0}|{1}|{2}|{3}|{4}|{5}" -f $pack.id, $pack.version, $step.id, $keyMaterial, $paramsJson, $baseSignature
 	                    $cacheKey = Get-CacheKeyHex -Value $keyValue
 	                    $cachePath = Join-Path -Path $cacheDir -ChildPath ("{0}.json" -f $cacheKey)
 
@@ -559,8 +641,14 @@ function Invoke-GCInsightPack {
         }
     }
 
-    $result | Add-Member -MemberType NoteProperty -Name Evidence -Value (New-GCInsightEvidencePacket -Result $result) -Force
+        $result | Add-Member -MemberType NoteProperty -Name Evidence -Value (New-GCInsightEvidencePacket -Result $result) -Force
 
-    return $result
+        return $result
+    }
+    finally {
+        if ($contextWasOverridden) {
+            $script:GCContext = $previousContext
+        }
+    }
 }
 ### END FILE: src\GenesysCloud.OpsInsights\Public\Invoke-GCInsightPack.ps1
