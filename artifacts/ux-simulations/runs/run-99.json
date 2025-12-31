@@ -1,16 +1,16 @@
 {
   "id": "run-99",
-  "journey": "save-favorite",
+  "journey": "onboarding",
   "profile": {
-    "Skill": "power",
-    "Viewport": "mobile",
-    "Network": "wifi",
-    "A11yMode": "high-contrast"
+    "Skill": "impatient",
+    "Viewport": "desktop",
+    "Network": "fast4g",
+    "A11yMode": "reduced-motion"
   },
-  "durationSec": 6.23,
-  "errors": 2,
+  "durationSec": 112.8,
+  "errors": 0,
   "rageClicks": 1,
   "stuck": false,
-  "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1717337Z"
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6824559Z"
 }

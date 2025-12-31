@@ -4,13 +4,13 @@
   "profile": {
     "Skill": "careful",
     "Viewport": "desktop",
-    "Network": "slow3g",
-    "A11yMode": "reduced-motion"
+    "Network": "wifi",
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 124.15,
+  "durationSec": 48.48,
   "errors": 2,
   "rageClicks": 0,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1615726Z"
+  "timestampUtc": "2025-12-31T12:12:05.6732057Z"
 }

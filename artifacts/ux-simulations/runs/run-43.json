@@ -1,16 +1,16 @@
 {
   "id": "run-43",
-  "journey": "submit-api",
+  "journey": "run-report",
   "profile": {
-    "Skill": "impatient",
-    "Viewport": "desktop",
-    "Network": "slow3g",
-    "A11yMode": "reduced-motion"
+    "Skill": "careful",
+    "Viewport": "mobile",
+    "Network": "wifi",
+    "A11yMode": "high-contrast"
   },
-  "durationSec": 64.34,
-  "errors": 0,
+  "durationSec": 45.78,
+  "errors": 2,
   "rageClicks": 1,
-  "stuck": false,
-  "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.1175103Z"
+  "stuck": true,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6329326Z"
 }

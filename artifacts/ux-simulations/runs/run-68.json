@@ -1,16 +1,16 @@
 {
   "id": "run-68",
-  "journey": "onboarding",
+  "journey": "save-favorite",
   "profile": {
-    "Skill": "novice",
-    "Viewport": "mobile",
+    "Skill": "power",
+    "Viewport": "tablet",
     "Network": "slow3g",
-    "A11yMode": "keyboard-only"
+    "A11yMode": "standard"
   },
-  "durationSec": 24.8,
-  "errors": 2,
+  "durationSec": 35.74,
+  "errors": 0,
   "rageClicks": 1,
   "stuck": false,
-  "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1408146Z"
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6541908Z"
 }

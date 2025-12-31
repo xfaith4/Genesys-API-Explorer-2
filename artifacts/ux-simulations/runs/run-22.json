@@ -2,15 +2,15 @@
   "id": "run-22",
   "journey": "run-report",
   "profile": {
-    "Skill": "careful",
-    "Viewport": "desktop",
+    "Skill": "power",
+    "Viewport": "mobile",
     "Network": "fast4g",
-    "A11yMode": "reduced-motion"
+    "A11yMode": "high-contrast"
   },
-  "durationSec": 60.98,
-  "errors": 1,
+  "durationSec": 37.78,
+  "errors": 2,
   "rageClicks": 1,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.0948040Z"
+  "timestampUtc": "2025-12-31T12:12:05.6110368Z"
 }

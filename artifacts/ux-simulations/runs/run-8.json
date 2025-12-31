@@ -1,16 +1,16 @@
 {
   "id": "run-8",
-  "journey": "onboarding",
+  "journey": "inspect-response",
   "profile": {
     "Skill": "novice",
-    "Viewport": "mobile",
-    "Network": "fast4g",
+    "Viewport": "desktop",
+    "Network": "slow3g",
     "A11yMode": "keyboard-only"
   },
-  "durationSec": 15.55,
-  "errors": 0,
+  "durationSec": 8.84,
+  "errors": 1,
   "rageClicks": 0,
   "stuck": false,
-  "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.0807641Z"
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.5978052Z"
 }

@@ -1,16 +1,16 @@
 {
   "id": "run-19",
-  "journey": "save-favorite",
+  "journey": "onboarding",
   "profile": {
-    "Skill": "impatient",
-    "Viewport": "tablet",
+    "Skill": "novice",
+    "Viewport": "desktop",
     "Network": "slow3g",
-    "A11yMode": "reduced-motion"
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 13.3,
-  "errors": 0,
-  "rageClicks": 1,
+  "durationSec": 123.94,
+  "errors": 2,
+  "rageClicks": 0,
   "stuck": false,
-  "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.0918041Z"
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6082200Z"
 }

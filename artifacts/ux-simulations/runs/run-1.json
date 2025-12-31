@@ -1,16 +1,16 @@
 {
   "id": "run-1",
-  "journey": "save-favorite",
+  "journey": "onboarding",
   "profile": {
-    "Skill": "novice",
-    "Viewport": "tablet",
-    "Network": "wifi",
-    "A11yMode": "standard"
+    "Skill": "impatient",
+    "Viewport": "desktop",
+    "Network": "fast4g",
+    "A11yMode": "high-contrast"
   },
-  "durationSec": 93.28,
+  "durationSec": 71.71,
   "errors": 0,
   "rageClicks": 1,
   "stuck": false,
   "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.0338343Z"
+  "timestampUtc": "2025-12-31T12:12:05.5483891Z"
 }

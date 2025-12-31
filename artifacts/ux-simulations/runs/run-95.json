@@ -1,16 +1,16 @@
 {
   "id": "run-95",
-  "journey": "run-report",
+  "journey": "onboarding",
   "profile": {
-    "Skill": "careful",
+    "Skill": "novice",
     "Viewport": "tablet",
-    "Network": "fast4g",
-    "A11yMode": "reduced-motion"
+    "Network": "slow3g",
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 39.61,
+  "durationSec": 6.37,
   "errors": 2,
   "rageClicks": 1,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1680439Z"
+  "timestampUtc": "2025-12-31T12:12:05.6790988Z"
 }

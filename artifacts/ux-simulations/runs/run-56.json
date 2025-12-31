@@ -1,16 +1,16 @@
 {
   "id": "run-56",
-  "journey": "onboarding",
+  "journey": "save-favorite",
   "profile": {
-    "Skill": "power",
+    "Skill": "impatient",
     "Viewport": "tablet",
     "Network": "slow3g",
     "A11yMode": "standard"
   },
-  "durationSec": 56.81,
-  "errors": 1,
+  "durationSec": 97.72,
+  "errors": 0,
   "rageClicks": 0,
   "stuck": false,
-  "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1296312Z"
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6440060Z"
 }

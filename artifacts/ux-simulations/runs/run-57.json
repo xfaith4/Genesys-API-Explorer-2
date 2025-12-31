@@ -1,16 +1,16 @@
 {
   "id": "run-57",
-  "journey": "run-report",
+  "journey": "inspect-response",
   "profile": {
-    "Skill": "novice",
+    "Skill": "careful",
     "Viewport": "tablet",
-    "Network": "fast4g",
-    "A11yMode": "standard"
+    "Network": "wifi",
+    "A11yMode": "high-contrast"
   },
-  "durationSec": 105.02,
-  "errors": 0,
+  "durationSec": 58.76,
+  "errors": 1,
   "rageClicks": 1,
   "stuck": false,
-  "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.1305964Z"
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6448803Z"
 }

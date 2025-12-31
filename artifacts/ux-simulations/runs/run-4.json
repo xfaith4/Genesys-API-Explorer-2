@@ -1,16 +1,16 @@
 {
   "id": "run-4",
-  "journey": "save-favorite",
+  "journey": "inspect-response",
   "profile": {
-    "Skill": "impatient",
-    "Viewport": "mobile",
-    "Network": "slow3g",
-    "A11yMode": "reduced-motion"
+    "Skill": "power",
+    "Viewport": "tablet",
+    "Network": "fast4g",
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 79.19,
-  "errors": 1,
+  "durationSec": 78.5,
+  "errors": 2,
   "rageClicks": 1,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.0684501Z"
+  "timestampUtc": "2025-12-31T12:12:05.5858689Z"
 }

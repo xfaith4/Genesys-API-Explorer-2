@@ -1,16 +1,16 @@
 {
   "id": "run-11",
-  "journey": "inspect-response",
+  "journey": "onboarding",
   "profile": {
-    "Skill": "power",
-    "Viewport": "tablet",
-    "Network": "fast4g",
-    "A11yMode": "keyboard-only"
+    "Skill": "novice",
+    "Viewport": "desktop",
+    "Network": "wifi",
+    "A11yMode": "standard"
   },
-  "durationSec": 102.94,
-  "errors": 1,
-  "rageClicks": 0,
+  "durationSec": 103.05,
+  "errors": 2,
+  "rageClicks": 1,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.0837708Z"
+  "timestampUtc": "2025-12-31T12:12:05.6006299Z"
 }

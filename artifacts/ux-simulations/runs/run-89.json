@@ -1,16 +1,16 @@
 {
   "id": "run-89",
-  "journey": "save-favorite",
+  "journey": "inspect-response",
   "profile": {
     "Skill": "power",
     "Viewport": "desktop",
-    "Network": "slow3g",
-    "A11yMode": "standard"
+    "Network": "fast4g",
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 10.03,
-  "errors": 0,
+  "durationSec": 90.08,
+  "errors": 2,
   "rageClicks": 1,
   "stuck": false,
-  "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.1624862Z"
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6740536Z"
 }

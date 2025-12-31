@@ -2,15 +2,15 @@
   "id": "run-91",
   "journey": "run-report",
   "profile": {
-    "Skill": "careful",
-    "Viewport": "mobile",
-    "Network": "slow3g",
-    "A11yMode": "reduced-motion"
+    "Skill": "impatient",
+    "Viewport": "tablet",
+    "Network": "wifi",
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 31.32,
-  "errors": 1,
-  "rageClicks": 1,
+  "durationSec": 14.99,
+  "errors": 0,
+  "rageClicks": 0,
   "stuck": false,
-  "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1643358Z"
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6757368Z"
 }

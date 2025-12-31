@@ -3,14 +3,14 @@
   "journey": "inspect-response",
   "profile": {
     "Skill": "impatient",
-    "Viewport": "desktop",
-    "Network": "wifi",
+    "Viewport": "mobile",
+    "Network": "fast4g",
     "A11yMode": "reduced-motion"
   },
-  "durationSec": 62.57,
+  "durationSec": 81.24,
   "errors": 0,
   "rageClicks": 1,
   "stuck": false,
   "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.1605958Z"
+  "timestampUtc": "2025-12-31T12:12:05.6723593Z"
 }

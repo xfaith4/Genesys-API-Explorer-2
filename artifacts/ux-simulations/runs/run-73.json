@@ -1,16 +1,16 @@
 {
   "id": "run-73",
-  "journey": "submit-api",
+  "journey": "onboarding",
   "profile": {
-    "Skill": "novice",
+    "Skill": "careful",
     "Viewport": "desktop",
-    "Network": "slow3g",
-    "A11yMode": "high-contrast"
+    "Network": "wifi",
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 60.64,
-  "errors": 0,
+  "durationSec": 102.34,
+  "errors": 2,
   "rageClicks": 1,
   "stuck": false,
-  "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.1454296Z"
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6583737Z"
 }

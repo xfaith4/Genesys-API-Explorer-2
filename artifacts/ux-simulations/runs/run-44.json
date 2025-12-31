@@ -1,16 +1,16 @@
 {
   "id": "run-44",
-  "journey": "onboarding",
+  "journey": "save-favorite",
   "profile": {
-    "Skill": "power",
+    "Skill": "careful",
     "Viewport": "mobile",
-    "Network": "slow3g",
-    "A11yMode": "reduced-motion"
+    "Network": "wifi",
+    "A11yMode": "standard"
   },
-  "durationSec": 15.15,
-  "errors": 2,
-  "rageClicks": 0,
+  "durationSec": 33.19,
+  "errors": 0,
+  "rageClicks": 1,
   "stuck": false,
-  "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1184602Z"
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6337893Z"
 }

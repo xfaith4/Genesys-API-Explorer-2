@@ -1,16 +1,16 @@
 {
   "id": "run-94",
-  "journey": "submit-api",
+  "journey": "run-report",
   "profile": {
-    "Skill": "novice",
+    "Skill": "careful",
     "Viewport": "desktop",
     "Network": "slow3g",
-    "A11yMode": "reduced-motion"
+    "A11yMode": "high-contrast"
   },
-  "durationSec": 52.09,
+  "durationSec": 32.84,
   "errors": 1,
-  "rageClicks": 1,
+  "rageClicks": 0,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1671230Z"
+  "timestampUtc": "2025-12-31T12:12:05.6782475Z"
 }

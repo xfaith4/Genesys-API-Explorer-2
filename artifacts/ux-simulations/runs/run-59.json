@@ -2,15 +2,15 @@
   "id": "run-59",
   "journey": "submit-api",
   "profile": {
-    "Skill": "power",
-    "Viewport": "tablet",
+    "Skill": "careful",
+    "Viewport": "mobile",
     "Network": "slow3g",
     "A11yMode": "standard"
   },
-  "durationSec": 7.67,
-  "errors": 1,
+  "durationSec": 114.49,
+  "errors": 2,
   "rageClicks": 1,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1324425Z"
+  "timestampUtc": "2025-12-31T12:12:05.6465415Z"
 }

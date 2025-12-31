@@ -2,15 +2,15 @@
   "id": "run-62",
   "journey": "save-favorite",
   "profile": {
-    "Skill": "impatient",
+    "Skill": "novice",
     "Viewport": "desktop",
-    "Network": "slow3g",
-    "A11yMode": "high-contrast"
+    "Network": "wifi",
+    "A11yMode": "reduced-motion"
   },
-  "durationSec": 7.21,
-  "errors": 2,
-  "rageClicks": 1,
-  "stuck": true,
-  "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1352570Z"
+  "durationSec": 104.34,
+  "errors": 0,
+  "rageClicks": 0,
+  "stuck": false,
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6491015Z"
 }

@@ -1,16 +1,16 @@
 {
   "id": "run-72",
-  "journey": "inspect-response",
+  "journey": "onboarding",
   "profile": {
     "Skill": "careful",
-    "Viewport": "mobile",
-    "Network": "slow3g",
-    "A11yMode": "standard"
+    "Viewport": "tablet",
+    "Network": "wifi",
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 14.51,
+  "durationSec": 43.11,
   "errors": 1,
-  "rageClicks": 0,
+  "rageClicks": 1,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1445100Z"
+  "timestampUtc": "2025-12-31T12:12:05.6575519Z"
 }

@@ -1,16 +1,16 @@
 {
   "id": "run-3",
-  "journey": "submit-api",
+  "journey": "save-favorite",
   "profile": {
-    "Skill": "careful",
+    "Skill": "power",
     "Viewport": "tablet",
     "Network": "slow3g",
-    "A11yMode": "standard"
+    "A11yMode": "reduced-motion"
   },
-  "durationSec": 26.85,
-  "errors": 1,
+  "durationSec": 65.25,
+  "errors": 0,
   "rageClicks": 0,
-  "stuck": false,
+  "stuck": true,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.0672051Z"
+  "timestampUtc": "2025-12-31T12:12:05.5846714Z"
 }

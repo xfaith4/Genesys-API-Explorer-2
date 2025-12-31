@@ -1,16 +1,16 @@
 {
   "id": "run-75",
-  "journey": "submit-api",
+  "journey": "onboarding",
   "profile": {
     "Skill": "power",
-    "Viewport": "mobile",
-    "Network": "wifi",
-    "A11yMode": "reduced-motion"
+    "Viewport": "tablet",
+    "Network": "fast4g",
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 51.04,
+  "durationSec": 6.22,
   "errors": 2,
-  "rageClicks": 0,
+  "rageClicks": 1,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1472598Z"
+  "timestampUtc": "2025-12-31T12:12:05.6600572Z"
 }

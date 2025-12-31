@@ -1,16 +1,16 @@
 {
   "id": "run-5",
-  "journey": "save-favorite",
+  "journey": "run-report",
   "profile": {
-    "Skill": "impatient",
-    "Viewport": "tablet",
+    "Skill": "careful",
+    "Viewport": "mobile",
     "Network": "wifi",
     "A11yMode": "reduced-motion"
   },
-  "durationSec": 69.35,
+  "durationSec": 123.98,
   "errors": 2,
   "rageClicks": 0,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.0696676Z"
+  "timestampUtc": "2025-12-31T12:12:05.5870712Z"
 }

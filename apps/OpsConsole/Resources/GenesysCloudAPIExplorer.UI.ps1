@@ -24,9 +24,26 @@ if (-not $ScriptRoot) {
 $DeveloperDocsUrl = "https://developer.genesys.cloud"
 $SupportDocsUrl = "https://help.mypurecloud.com"
 
+function Get-RepoRoot {
+    param([string]$StartPath)
+
+    $current = if ($StartPath) { $StartPath } else { $ScriptRoot }
+    for ($i = 0; $i -lt 5; $i++) {
+        if (Test-Path -LiteralPath (Join-Path $current "GenesysCloudAPIExplorer.ps1")) {
+            return $current
+        }
+        $parent = Split-Path -Parent $current
+        if (-not $parent -or $parent -eq $current) { break }
+        $current = $parent
+    }
+
+    return $ScriptRoot
+}
+
 . "$ScriptRoot/UxTelemetry.ps1"
 $script:UxSessionId = [guid]::NewGuid().ToString()
-$telemetryRoot = [System.IO.Path]::GetFullPath((Join-Path $ScriptRoot "../../artifacts/ux-simulations"))
+$telemetryRoot = Join-Path (Get-RepoRoot -StartPath $ScriptRoot) 'artifacts/ux-simulations'
+$telemetryRoot = [System.IO.Path]::GetFullPath($telemetryRoot)
 Initialize-UxTelemetry -TargetPath (Get-UxTelemetryDefaultPath -RootPath $telemetryRoot) -SessionId $script:UxSessionId
 
 $script:DesignTokens = @{}
@@ -37,10 +54,12 @@ try {
     }
 }
 catch {
-    # Keep defaults if tokens fail to load
+    Write-Verbose "Design tokens failed to load: $($_.Exception.Message)"
 }
 $script:UxDebugBlock = $null
-$script:SubmitClickTimes = New-Object System.Collections.Generic.List[datetime]
+$script:UxDebugWindow = $null
+$script:RageClickWindowSeconds = 2
+$script:SubmitClickTimes = New-Object System.Collections.Generic.Queue[datetime]
 
 function Get-TraceLogPath {
     try {
@@ -6196,6 +6215,24 @@ $segmentValueInput = $Window.FindName("SegmentValueInput")
 $addSegmentPredicateButton = $Window.FindName("AddSegmentPredicateButton")
 $removeSegmentPredicateButton = $Window.FindName("RemoveSegmentPredicateButton")
 
+$Window.Add_Closing({
+        Flush-UxTelemetryBuffer
+        if ($script:UxTelemetryState.Writer) {
+            $script:UxTelemetryState.Writer.Flush()
+            $script:UxTelemetryState.Writer.Dispose()
+            $script:UxTelemetryState.Writer = $null
+        }
+        if ($script:UxTelemetryState.FlushTimer) {
+            $script:UxTelemetryState.FlushTimer.Stop()
+            $script:UxTelemetryState.FlushTimer.Dispose()
+            $script:UxTelemetryState.FlushTimer = $null
+        }
+        if ($script:UxDebugWindow) {
+            $script:UxDebugWindow.Close()
+            $script:UxDebugWindow = $null
+        }
+    })
+
 if ($mainTabControl) {
     $mainTabControl.Add_SelectionChanged({
             if ($mainTabControl.SelectedItem) {
@@ -6510,15 +6547,19 @@ function Ensure-UxDebugHud {
 
     $hud.Content = $panel
     $script:UxDebugBlock = $text
+    $script:UxDebugWindow = $hud
     $hud.Show()
 }
 
 function Test-RageClick {
     param([datetime]$Now)
 
-    $script:SubmitClickTimes.Add($Now)
-    while ($script:SubmitClickTimes.Count -gt 0 -and ($Now - $script:SubmitClickTimes[0]).TotalSeconds -gt 2) {
-        $script:SubmitClickTimes.RemoveAt(0)
+    $script:SubmitClickTimes.Enqueue($Now)
+    while ($script:SubmitClickTimes.Count -gt 0 -and ($Now - $script:SubmitClickTimes.Peek()).TotalSeconds -gt $script:RageClickWindowSeconds) {
+        $null = $script:SubmitClickTimes.Dequeue()
+    }
+    if ($script:SubmitClickTimes.Count -gt 20) {
+        $null = $script:SubmitClickTimes.Dequeue()
     }
     return ($script:SubmitClickTimes.Count -ge 3)
 }

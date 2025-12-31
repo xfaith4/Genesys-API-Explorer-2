@@ -1,16 +1,16 @@
 {
   "id": "run-98",
-  "journey": "inspect-response",
+  "journey": "submit-api",
   "profile": {
     "Skill": "power",
-    "Viewport": "tablet",
-    "Network": "fast4g",
-    "A11yMode": "standard"
+    "Viewport": "mobile",
+    "Network": "wifi",
+    "A11yMode": "keyboard-only"
   },
-  "durationSec": 78.21,
-  "errors": 0,
+  "durationSec": 23.56,
+  "errors": 1,
   "rageClicks": 0,
   "stuck": false,
-  "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.1708199Z"
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6816181Z"
 }

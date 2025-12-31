@@ -11,6 +11,7 @@ $tracesDir = Join-Path $artifactsRoot 'traces'
 $null = New-Item -ItemType Directory -Force -Path $runsDir, $screensDir, $tracesDir
 
 $simulationCount = 100
+$StuckProbability = 0.05
 $rng = New-Object System.Random
 
 function New-SimulatedUserProfile {
@@ -35,7 +36,7 @@ function Invoke-SimulatedJourney {
     $errors = $rng.Next(0, 3)
     $rageClicks = $rng.Next(0, 2)
     $duration = [Math]::Round($rng.NextDouble() * 120 + 5, 2)
-    $stuck = $rng.NextDouble() -lt 0.05
+    $stuck = $rng.NextDouble() -lt $StuckProbability
 
     return [pscustomobject]@{
         id            = "run-$Index"
@@ -50,20 +51,21 @@ function Invoke-SimulatedJourney {
     }
 }
 
-$runs = @()
+$runs = New-Object System.Collections.Generic.List[object]
 for ($i = 1; $i -le $simulationCount; $i++) {
     $run = Invoke-SimulatedJourney -Index $i
-    $runs += $run
+    $null = $runs.Add($run)
     $run | ConvertTo-Json -Depth 5 | Out-File -FilePath (Join-Path $runsDir "$($run.id).json") -Encoding utf8
 }
 
+$runsArray = $runs.ToArray()
 $summary = [pscustomobject]@{
     totalRuns          = $simulationCount
-    completionRate     = [Math]::Round((($runs | Where-Object { $_.completed }).Count / $simulationCount) * 100, 2)
-    meanDurationSec    = [Math]::Round(($runs.durationSec | Measure-Object -Average).Average, 2)
-    errorRate          = [Math]::Round((($runs | Where-Object { $_.errors -gt 0 }).Count / $simulationCount) * 100, 2)
-    rageClickRate      = [Math]::Round((($runs | Where-Object { $_.rageClicks -gt 0 }).Count / $simulationCount) * 100, 2)
-    stuckRate          = [Math]::Round((($runs | Where-Object { $_.stuck }).Count / $simulationCount) * 100, 2)
+    completionRate     = [Math]::Round((($runsArray | Where-Object { $_.completed }).Count / $simulationCount) * 100, 2)
+    meanDurationSec    = [Math]::Round((($runsArray | Select-Object -ExpandProperty durationSec | Measure-Object -Average).Average), 2)
+    errorRate          = [Math]::Round((($runsArray | Where-Object { $_.errors -gt 0 }).Count / $simulationCount) * 100, 2)
+    rageClickRate      = [Math]::Round((($runsArray | Where-Object { $_.rageClicks -gt 0 }).Count / $simulationCount) * 100, 2)
+    stuckRate          = [Math]::Round((($runsArray | Where-Object { $_.stuck }).Count / $simulationCount) * 100, 2)
 }
 
 $summary | ConvertTo-Json -Depth 5 | Out-File -FilePath (Join-Path $artifactsRoot 'simulation-summary.json') -Encoding utf8

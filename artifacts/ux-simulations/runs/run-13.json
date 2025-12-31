@@ -2,15 +2,15 @@
   "id": "run-13",
   "journey": "submit-api",
   "profile": {
-    "Skill": "power",
-    "Viewport": "tablet",
-    "Network": "slow3g",
-    "A11yMode": "keyboard-only"
+    "Skill": "novice",
+    "Viewport": "desktop",
+    "Network": "fast4g",
+    "A11yMode": "high-contrast"
   },
-  "durationSec": 59.61,
-  "errors": 1,
-  "rageClicks": 1,
+  "durationSec": 122.92,
+  "errors": 2,
+  "rageClicks": 0,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.0857627Z"
+  "timestampUtc": "2025-12-31T12:12:05.6024942Z"
 }

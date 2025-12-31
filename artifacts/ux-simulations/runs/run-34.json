@@ -1,16 +1,16 @@
 {
   "id": "run-34",
-  "journey": "onboarding",
+  "journey": "submit-api",
   "profile": {
-    "Skill": "impatient",
-    "Viewport": "mobile",
-    "Network": "wifi",
+    "Skill": "power",
+    "Viewport": "tablet",
+    "Network": "slow3g",
     "A11yMode": "standard"
   },
-  "durationSec": 32.87,
-  "errors": 1,
-  "rageClicks": 1,
+  "durationSec": 35.82,
+  "errors": 0,
+  "rageClicks": 0,
   "stuck": false,
-  "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1073087Z"
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6230794Z"
 }

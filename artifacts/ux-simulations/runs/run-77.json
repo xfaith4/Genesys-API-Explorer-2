@@ -1,16 +1,16 @@
 {
   "id": "run-77",
-  "journey": "onboarding",
+  "journey": "save-favorite",
   "profile": {
     "Skill": "impatient",
-    "Viewport": "desktop",
+    "Viewport": "tablet",
     "Network": "slow3g",
-    "A11yMode": "standard"
+    "A11yMode": "reduced-motion"
   },
-  "durationSec": 70.1,
-  "errors": 0,
-  "rageClicks": 0,
+  "durationSec": 83.85,
+  "errors": 1,
+  "rageClicks": 1,
   "stuck": false,
-  "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.1491119Z"
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6617550Z"
 }

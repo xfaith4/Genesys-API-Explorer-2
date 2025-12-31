@@ -1,16 +1,16 @@
 {
   "id": "run-47",
-  "journey": "onboarding",
+  "journey": "run-report",
   "profile": {
     "Skill": "power",
-    "Viewport": "mobile",
+    "Viewport": "desktop",
     "Network": "slow3g",
-    "A11yMode": "reduced-motion"
+    "A11yMode": "standard"
   },
-  "durationSec": 23.03,
+  "durationSec": 14.22,
   "errors": 2,
   "rageClicks": 1,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1212571Z"
+  "timestampUtc": "2025-12-31T12:12:05.6363607Z"
 }

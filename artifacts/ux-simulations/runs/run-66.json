@@ -1,16 +1,16 @@
 {
   "id": "run-66",
-  "journey": "submit-api",
+  "journey": "onboarding",
   "profile": {
     "Skill": "power",
     "Viewport": "desktop",
-    "Network": "fast4g",
-    "A11yMode": "reduced-motion"
+    "Network": "slow3g",
+    "A11yMode": "standard"
   },
-  "durationSec": 103.21,
-  "errors": 1,
+  "durationSec": 94.6,
+  "errors": 0,
   "rageClicks": 1,
   "stuck": false,
-  "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1389723Z"
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6524822Z"
 }

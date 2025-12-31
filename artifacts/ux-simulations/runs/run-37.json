@@ -2,15 +2,15 @@
   "id": "run-37",
   "journey": "save-favorite",
   "profile": {
-    "Skill": "power",
-    "Viewport": "tablet",
+    "Skill": "novice",
+    "Viewport": "desktop",
     "Network": "wifi",
     "A11yMode": "keyboard-only"
   },
-  "durationSec": 121.74,
-  "errors": 1,
+  "durationSec": 13.12,
+  "errors": 0,
   "rageClicks": 1,
   "stuck": false,
-  "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1113839Z"
+  "completed": true,
+  "timestampUtc": "2025-12-31T12:12:05.6269560Z"
 }

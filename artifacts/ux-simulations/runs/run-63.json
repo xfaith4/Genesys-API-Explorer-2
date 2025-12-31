@@ -1,16 +1,16 @@
 {
   "id": "run-63",
-  "journey": "save-favorite",
+  "journey": "onboarding",
   "profile": {
     "Skill": "careful",
     "Viewport": "tablet",
-    "Network": "wifi",
-    "A11yMode": "standard"
+    "Network": "slow3g",
+    "A11yMode": "reduced-motion"
   },
-  "durationSec": 18.69,
+  "durationSec": 120.16,
   "errors": 1,
   "rageClicks": 1,
   "stuck": false,
   "completed": false,
-  "timestampUtc": "2025-12-31T12:06:11.1361815Z"
+  "timestampUtc": "2025-12-31T12:12:05.6499704Z"
 }

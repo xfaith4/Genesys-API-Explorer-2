@@ -1,16 +1,16 @@
 {
   "id": "run-67",
-  "journey": "inspect-response",
+  "journey": "submit-api",
   "profile": {
     "Skill": "power",
     "Viewport": "tablet",
-    "Network": "wifi",
+    "Network": "slow3g",
     "A11yMode": "standard"
   },
-  "durationSec": 21.51,
-  "errors": 0,
+  "durationSec": 117.56,
+  "errors": 2,
   "rageClicks": 0,
-  "stuck": false,
-  "completed": true,
-  "timestampUtc": "2025-12-31T12:06:11.1398931Z"
+  "stuck": true,
+  "completed": false,
+  "timestampUtc": "2025-12-31T12:12:05.6533435Z"
 }

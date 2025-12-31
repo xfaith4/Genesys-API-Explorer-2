@@ -1,4 +1,3 @@
-### BEGIN FILE: tests\UxTelemetry.Tests.ps1
 Describe 'UxTelemetry' {
     BeforeAll {
         $here = Split-Path -Parent $PSCommandPath
@@ -23,6 +22,7 @@ Describe 'UxTelemetry' {
         Initialize-UxTelemetry -TargetPath $tempPath -SessionId "test-session"
 
         Write-UxEvent -Name "page_view" -Properties @{ route = "home"; ts = "2025-01-01T00:00:00Z" }
+        Flush-UxTelemetryBuffer
         (Test-Path -LiteralPath $tempPath) | Should -BeTrue
 
         $line = Get-Content -LiteralPath $tempPath -TotalCount 1
@@ -32,4 +32,3 @@ Describe 'UxTelemetry' {
         $obj.props.route | Should -Be "home"
     }
 }
-### END FILE
