@@ -7,7 +7,16 @@ function Invoke-GCInsightsPack {
         [string]$PackPath,
 
         [Parameter()]
-        [hashtable]$Parameters
+        [hashtable]$Parameters,
+
+        [Parameter()]
+        [string]$BaseUri,
+
+        [Parameter()]
+        [string]$AccessToken,
+
+        [Parameter()]
+        [scriptblock]$TokenProvider
     )
 
     # Forward legacy plural name to the current single-pack entry point.
